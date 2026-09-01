@@ -452,6 +452,10 @@ class SerializerContext {
         this.emit(parts.join(' ') + ' {')
         this.depth++
 
+        if (ws.impliedRelationships) {
+            this.emit('!impliedRelationships true')
+        }
+
         this.emitBlank()
         this.serializeModel()
         this.emitBlank()

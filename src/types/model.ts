@@ -253,6 +253,13 @@ export interface Workspace {
   name?: string
   description?: string
   scope?: WorkspaceScope
+  /** Set by `!impliedRelationships true`. Structurizr semantics: off by
+   *  default. When on, views draw a dashed edge between ancestors of two
+   *  elements that have no direct relationship of their own but whose
+   *  descendants (components/containers) do — e.g. two software systems
+   *  whose containers talk to each other. Computed on demand per view by
+   *  impliedViewRelationships(), never materialized into model.relationships. */
+  impliedRelationships?: boolean
   model: Model
   views: {
     systemLandscapeViews: View[]

@@ -169,6 +169,10 @@ export class ContextAwareParser {
      *  either way; the flag records the DSL's declared intent. */
     hierarchicalIdentifiers = false
 
+    /** Set by `!impliedRelationships true|false`. Copied onto the workspace
+     *  once parsing finishes — see noteDirective(). */
+    impliedRelationships: boolean | undefined = undefined
+
     relCounter = 0
 
     // Track elements excluded per view (used in post-processing to apply `exclude` directives)
@@ -356,6 +360,10 @@ export class ContextAwareParser {
         if (/^!identifiers\b/.test(value) && /\bhierarchical\b/.test(value)) {
             this.hierarchicalIdentifiers = true
         }
+        const implied = /^!impliedRelationships\s+(true|false)\b/.exec(value)
+        if (implied) {
+            this.impliedRelationships = implied[1] === 'true'
+        }
     }
 
     // ─── Qualified (hierarchical) references ─────────────────────────
@@ -474,6 +482,10 @@ export class ContextAwareParser {
                 this.parseWorkspaceBody(workspace)
                 this.skipNewlines()
                 this.match('RBRACE')
+            }
+
+            if (this.impliedRelationships !== undefined) {
+                workspace.impliedRelationships = this.impliedRelationships
             }
         }
 

@@ -184,3 +184,74 @@ describe('buildEdges handle routing', () => {
     }
   })
 })
+
+/** Two systems, each with one container; only the containers have an explicit
+ *  relationship. The view shows just the two systems, so nothing connects
+ *  them unless implied relationships fill in the ancestor edge. */
+function impliedTestWorkspace(impliedRelationships: boolean): Workspace {
+  return {
+    name: 'Implied test',
+    impliedRelationships,
+    model: {
+      people: [],
+      softwareSystems: [
+        {
+          id: 'sys-a', type: 'softwareSystem', name: 'System A', tags: [], properties: {},
+          containers: [{ id: 'c-a1', type: 'container', name: 'API A', tags: [], properties: {}, components: [] }],
+        },
+        {
+          id: 'sys-b', type: 'softwareSystem', name: 'System B', tags: [], properties: {},
+          containers: [{ id: 'c-b1', type: 'container', name: 'API B', tags: [], properties: {}, components: [] }],
+        },
+      ],
+      relationships: [
+        { id: 'rel-0', sourceId: 'c-a1', destinationId: 'c-b1', tags: ['Relationship'], properties: {} },
+      ],
+      groups: [],
+    },
+    views: {
+      systemLandscapeViews: [
+        {
+          type: 'systemLandscape',
+          key: 'landscape',
+          elements: [{ id: 'sys-a' }, { id: 'sys-b' }],
+          relationships: [], // the explicit relationship lives on the containers, which aren't in this view
+        },
+      ],
+      systemContextViews: [],
+      containerViews: [],
+      componentViews: [],
+      configuration: { styles: { elements: [], relationships: [] } },
+    },
+  }
+}
+
+const impliedTestNodes: Node[] = [
+  { id: 'sys-a', type: 'softwareSystem', position: { x: 0, y: 0 }, data: {} },
+  { id: 'sys-b', type: 'softwareSystem', position: { x: 400, y: 0 }, data: {} },
+]
+
+describe('buildEdges implied relationships', () => {
+  it('draws a dashed implied edge between systems when the workspace opts in', () => {
+    const ws = impliedTestWorkspace(true)
+    const edges = buildEdges(ws, ws.views.systemLandscapeViews[0], impliedTestNodes, NO_FILTERS)
+    expect(edges).toHaveLength(1)
+    expect(edges[0].source).toBe('sys-a')
+    expect(edges[0].target).toBe('sys-b')
+    expect(edges[0].data?.relationship.tags).toContain('Implied')
+    expect(edges[0].data?.relationshipStyle?.dashed).toBe(true)
+  })
+
+  it('draws nothing when the workspace has not opted in', () => {
+    const ws = impliedTestWorkspace(false)
+    const edges = buildEdges(ws, ws.views.systemLandscapeViews[0], impliedTestNodes, NO_FILTERS)
+    expect(edges).toHaveLength(0)
+  })
+
+  it('draws nothing for dynamic views even when opted in', () => {
+    const ws = impliedTestWorkspace(true)
+    const dynamicView = { ...ws.views.systemLandscapeViews[0], type: 'dynamic' as const }
+    const edges = buildEdges(ws, dynamicView, impliedTestNodes, NO_FILTERS)
+    expect(edges).toHaveLength(0)
+  })
+})
