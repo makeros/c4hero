@@ -11,6 +11,7 @@ const RESET_DEFAULTS = {
   snapToGrid: false,
   colorTheme: 'readability' as const,
   canvasGuideDismissed: false,
+  alwaysExpandDetails: false,
 }
 
 async function importFreshSettingsStore() {
@@ -48,6 +49,10 @@ describe('useSettingsStore', () => {
 
   it('has default canvasGuideDismissed false', () => {
     expect(useSettingsStore.getState().canvasGuideDismissed).toBe(false)
+  })
+
+  it('has default alwaysExpandDetails false', () => {
+    expect(useSettingsStore.getState().alwaysExpandDetails).toBe(false)
   })
 
   it('update() changes a setting and persists it to localStorage', () => {
@@ -102,6 +107,7 @@ describe('useSettingsStore', () => {
       snapToGrid: true,
       colorTheme: 'structurizr',
       canvasGuideDismissed: true,
+      alwaysExpandDetails: true,
     }))
 
     const freshStore = await importFreshSettingsStore()
@@ -112,6 +118,7 @@ describe('useSettingsStore', () => {
       snapToGrid: true,
       colorTheme: 'structurizr',
       canvasGuideDismissed: true,
+      alwaysExpandDetails: true,
     })
   })
 
@@ -123,6 +130,7 @@ describe('useSettingsStore', () => {
       snapToGrid: 1,
       colorTheme: 'neon',
       canvasGuideDismissed: 'yes',
+      alwaysExpandDetails: 'yes',
     }))
 
     const freshStore = await importFreshSettingsStore()
@@ -133,6 +141,7 @@ describe('useSettingsStore', () => {
       snapToGrid: false,
       colorTheme: 'readability',
       canvasGuideDismissed: false,
+      alwaysExpandDetails: false,
     })
   })
 

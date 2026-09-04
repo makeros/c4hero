@@ -139,6 +139,17 @@ export default function CanvasSettingsDialog({ onClose }: { onClose: () => void 
             />
           </SettingRow>
 
+          {/* Always expand details */}
+          <SettingRow
+            label="Always expand details"
+            description="Keep descriptions and relationship labels fully expanded at any zoom level"
+          >
+            <Toggle
+              checked={settings.alwaysExpandDetails}
+              onChange={(v) => settings.update({ alwaysExpandDetails: v })}
+            />
+          </SettingRow>
+
           <SettingRow
             label="Canvas guide"
             description="Show the quick getting-started walkthrough"
