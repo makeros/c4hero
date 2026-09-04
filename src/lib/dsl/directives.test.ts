@@ -27,7 +27,7 @@ workspace "Test" {
     expect(workspace.model.people[0].name).toBe('Alice')
   })
 
-  it('parses !impliedRelationships without errors', () => {
+  it('parses !impliedRelationships true and sets the workspace flag', () => {
     const dsl = `
 workspace "Test" {
   !impliedRelationships true
@@ -41,6 +41,44 @@ workspace "Test" {
     const { errors, workspace } = parseDSL(dsl)
     expect(errors).toHaveLength(0)
     expect(workspace.model.softwareSystems).toHaveLength(1)
+    expect(workspace.impliedRelationships).toBe(true)
+  })
+
+  it('parses !impliedRelationships false and leaves the workspace flag unset', () => {
+    const dsl = `
+workspace "Test" {
+  !impliedRelationships false
+  model {
+    api = softwareSystem "API"
+  }
+  views {}
+}
+`
+    const { errors, workspace } = parseDSL(dsl)
+    expect(errors).toHaveLength(0)
+    expect(workspace.impliedRelationships).toBe(false)
+  })
+
+  it('roundtrips !impliedRelationships true through serialize → parse', () => {
+    const dsl = `
+workspace "Test" {
+  !impliedRelationships true
+  model {
+    api = softwareSystem "API"
+  }
+  views {
+    systemLandscape "overview" {
+      include *
+    }
+  }
+}
+`
+    const { workspace, errors } = parseDSL(dsl)
+    expect(errors).toHaveLength(0)
+    const reserialized = serializeDSL(workspace)
+    const { workspace: reparsed, errors: errors2 } = parseDSL(reserialized)
+    expect(errors2).toHaveLength(0)
+    expect(reparsed.impliedRelationships).toBe(true)
   })
 
   it('parses !include line without errors', () => {

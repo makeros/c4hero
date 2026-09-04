@@ -10,6 +10,7 @@ import {
 import { CENTER_SLOT, handleId, pickSlots, type Side } from './handleSlots'
 import { buildDeploymentLayoutClusters, buildDeploymentBoundaryNodes } from './deploymentBuilders'
 import { deploymentViewRelationships } from '@/lib/deployment'
+import { impliedViewRelationships } from '@/lib/impliedRelationships'
 import type { ModelElement, ElementStyle, RelationshipStyle, View, Workspace } from '@/types/model'
 
 /** Build a tag → style index from the styles array (O(S) once, then O(1) lookups) */
@@ -61,6 +62,17 @@ function getRelationshipStyle(
   for (const style of styles) {
     if (tags.includes(style.tag)) {
       matched = { ...matched, ...style }
+    }
+  }
+  // Implied relationships (computed on demand, see impliedViewRelationships)
+  // default to a dashed, muted line so they read as inferred rather than
+  // authored, unless a workspace style already overrides dashed/opacity.
+  if (tags.includes('Implied')) {
+    matched = {
+      tag: 'Implied',
+      ...matched,
+      dashed: matched?.dashed ?? true,
+      opacity: matched?.opacity ?? 0.6,
     }
   }
   return matched
@@ -560,6 +572,15 @@ export function buildEdges(
         stepDescription: viewRel.description,
       })
     })
+
+    // Structurizr-style implied relationships: opt-in via `!impliedRelationships
+    // true`, and meaningless for dynamic views (their edges are an explicit,
+    // ordered interaction sequence, not a graph of "what talks to what").
+    if (workspace.impliedRelationships && view.type !== 'dynamic') {
+      for (const rel of impliedViewRelationships(workspace.model, viewElementIds)) {
+        drawn.push({ rel, edgeId: rel.id, sourceId: rel.sourceId, targetId: rel.destinationId })
+      }
+    }
   }
 
   const edgeInfos: EdgeInfo[] = []
