@@ -26,6 +26,7 @@ export interface AppSettings {
   snapToGrid: boolean
   colorTheme: ColorTheme
   canvasGuideDismissed: boolean
+  alwaysExpandDetails: boolean
 }
 
 const DEFAULTS: AppSettings = {
@@ -36,6 +37,7 @@ const DEFAULTS: AppSettings = {
   snapToGrid: false,
   colorTheme: 'readability',
   canvasGuideDismissed: false,
+  alwaysExpandDetails: false,
 }
 
 const STORAGE_KEY = 'c4hero.json'
@@ -77,6 +79,7 @@ function normalizeSettings(value: unknown): AppSettings {
     snapToGrid: readBoolean(source, 'snapToGrid', DEFAULTS.snapToGrid),
     colorTheme: isColorTheme(source.colorTheme) ? source.colorTheme : DEFAULTS.colorTheme,
     canvasGuideDismissed: readBoolean(source, 'canvasGuideDismissed', DEFAULTS.canvasGuideDismissed),
+    alwaysExpandDetails: readBoolean(source, 'alwaysExpandDetails', DEFAULTS.alwaysExpandDetails),
   }
 }
 

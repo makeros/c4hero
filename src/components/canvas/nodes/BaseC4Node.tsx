@@ -12,6 +12,7 @@ import InlineName from './InlineName'
 import NodeHandles from './NodeHandles'
 import ZoomHoverCard from './ZoomHoverCard'
 import { useWorkspaceStore } from '@/store/workspace'
+import { useSettingsStore } from '@/store/settings'
 import { useZoomLevel } from '@/hooks/useZoomLevel'
 import { pickHighlightReason } from '@/lib/highlight'
 
@@ -100,8 +101,11 @@ export default function BaseC4Node({
   // Font size from tag style (pixels)
   const resolvedFontSize = style?.fontSize
 
-  // Semantic zoom: show different detail levels based on viewport zoom
-  const zoomLevel = useZoomLevel()
+  // Semantic zoom: show different detail levels based on viewport zoom, unless
+  // the user has opted to always keep descriptions and labels fully expanded.
+  const alwaysExpandDetails = useSettingsStore((s) => s.alwaysExpandDetails)
+  const rawZoomLevel = useZoomLevel()
+  const zoomLevel = alwaysExpandDetails ? 'full' : rawZoomLevel
   const isCompact = zoomLevel === 'compact'
   const isFull = zoomLevel === 'full'
   const nameClamp = isCompact ? 1 : isFull ? undefined : 2

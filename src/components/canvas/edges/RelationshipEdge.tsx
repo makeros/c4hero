@@ -9,6 +9,7 @@ import {
   type EdgeProps,
 } from '@xyflow/react'
 import type { Relationship, RelationshipStyle } from '@/types/model'
+import { useSettingsStore } from '@/store/settings'
 import { getEdgeLabelDensity, truncateEdgeLabel } from './relationshipEdgeLabels'
 
 interface RelationshipEdgeData {
@@ -96,11 +97,12 @@ function RelationshipEdge({
   const isDashed = isAsync || (relStyle?.dashed ?? false)
 
   const [hovered, setHovered] = useState(false)
+  const alwaysExpandDetails = useSettingsStore((s) => s.alwaysExpandDetails)
   const technologyTokens = useMemo(
     () => relationship?.technology?.split(',').map((t) => t.trim()).filter(Boolean) ?? [],
     [relationship?.technology],
   )
-  const labelDensity = getEdgeLabelDensity({
+  const labelDensity = alwaysExpandDetails ? 'full' : getEdgeLabelDensity({
     lineStyle,
     sourceX,
     sourceY,
