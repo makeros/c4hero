@@ -139,7 +139,9 @@ function getReactFlowCanvasRect(): DOMRect | null {
   return element?.getBoundingClientRect() ?? null
 }
 
-function getNodeBounds(nodes: Node[]): { centerX: number; centerY: number; width: number; height: number } | null {
+export function getNodeBounds(
+  nodes: Node[],
+): { minX: number; minY: number; centerX: number; centerY: number; width: number; height: number } | null {
   let minX = Infinity
   let minY = Infinity
   let maxX = -Infinity
@@ -159,6 +161,8 @@ function getNodeBounds(nodes: Node[]): { centerX: number; centerY: number; width
   const width = Math.max(1, maxX - minX)
   const height = Math.max(1, maxY - minY)
   return {
+    minX,
+    minY,
     centerX: minX + width / 2,
     centerY: minY + height / 2,
     width,

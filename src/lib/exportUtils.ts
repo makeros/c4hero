@@ -28,7 +28,7 @@ export function downloadBlob(blob: Blob, filename: string) {
 export type ExportTheme = 'dark' | 'light' | 'current'
 
 /** Light theme background / override vars */
-const LIGHT_STYLE: Record<string, string> = {
+export const LIGHT_STYLE: Record<string, string> = {
   '--color-bg-primary': '#f8fafc',
   '--color-surface-1': '#ffffff',
   '--color-surface-2': '#f1f5f9',

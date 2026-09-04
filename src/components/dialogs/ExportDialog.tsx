@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Download, Copy, Check } from 'lucide-react'
+import { Download, Copy, Check, Package } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { ExportTheme } from '@/lib/exportUtils'
 import { createLogger } from '@/lib/logger'
@@ -10,6 +10,7 @@ const log = createLogger('ExportDialog')
 interface ExportDialogProps {
   onExport: (format: 'dsl' | 'png' | 'svg', theme?: ExportTheme) => Promise<void>
   onCopy: (type: 'png-dark' | 'png-light' | 'png-current' | 'dsl') => Promise<void>
+  onOpenProposal: () => void
   onClose: () => void
 }
 
@@ -20,7 +21,7 @@ interface ExportAction {
   fn: () => Promise<void>
 }
 
-export default function ExportDialog({ onExport, onCopy, onClose }: ExportDialogProps) {
+export default function ExportDialog({ onExport, onCopy, onOpenProposal, onClose }: ExportDialogProps) {
   const [busy, setBusy] = useState<string | null>(null)
   const [done, setDone] = useState<string | null>(null)
   const doneTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -155,6 +156,52 @@ export default function ExportDialog({ onExport, onCopy, onClose }: ExportDialog
               </div>
             </div>
           ))}
+
+          {/* Proposal Package — opens the multi-view picker dialog (this dialog closes). */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 12,
+              padding: '8px',
+              borderRadius: 'var(--radius-md)',
+            }}
+          >
+            <div>
+              <div style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--color-text-primary)' }}>
+                Proposal Package
+              </div>
+              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
+                .zip — multiple views
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+              <button
+                onClick={onOpenProposal}
+                title="Select views to export"
+                aria-label="Select views to export"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 5,
+                  padding: '5px 10px',
+                  borderRadius: 'var(--radius-sm)',
+                  border: '1px solid var(--color-border)',
+                  background: 'var(--color-surface-2)',
+                  color: 'var(--color-text-secondary)',
+                  fontSize: 'var(--text-xs)',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  flexShrink: 0,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                <Package size={12} />
+                Select Views…
+              </button>
+            </div>
+          </div>
         </div>
     </DialogShell>
   )

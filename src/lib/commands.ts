@@ -4,7 +4,7 @@ import {
   MousePointer, LayoutDashboard, Maximize2, ZoomIn, ZoomOut,
   LayoutGrid, Search, Save, Settings, Monitor,
   Presentation, FolderOpen, Image, FileCode, Copy, Plus,
-  Highlighter, MousePointerClick, RotateCcw, CircleHelp, Sparkles,
+  Highlighter, MousePointerClick, RotateCcw, CircleHelp, Sparkles, Package,
 } from 'lucide-react'
 import { useWorkspaceStore, getCreatableTypes, getActiveView, getAllViews, isFocalScopeElement } from '@/store/workspace'
 import { computeCascadeImpact } from '@/store/workspace-helpers'
@@ -425,6 +425,18 @@ export function getCommands(reactFlow: ReactFlowInstance | null): Command[] {
         if (!s.workspace) return
         const svg = exportCanvasAsSVG()
         if (svg) downloadFile(svg, `${s.workspace.name ?? 'workspace'}.svg`, 'image/svg+xml')
+      },
+    },
+    {
+      id: 'export-proposal',
+      label: 'Export for Proposal',
+      category: 'export',
+      icon: Package,
+      keywords: ['export', 'proposal', 'zip', 'package', 'batch', 'views'],
+      execute: () => {
+        const s = store()
+        if (!s.workspace) return
+        s.setExportProposalDialogOpen(true)
       },
     },
   ]

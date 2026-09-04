@@ -1,8 +1,12 @@
 import { lazy, Suspense, useEffect, useState, useCallback } from 'react'
+import { useReactFlow } from '@xyflow/react'
 import { useBreakpoint } from '@/hooks/useBreakpoint'
 import LoadingDot from '@/components/shared/LoadingDot'
 import { useWorkspaceStore, getAllViews } from '@/store/workspace'
 import { downloadFile, downloadBlob, exportCanvasAsPNG, exportCanvasAsSVG, copyCanvasAsPNG, copyTextToClipboard, type ExportTheme } from '@/lib/exportUtils'
+import { exportViewsForProposal } from '@/lib/exportProposal'
+import { createZipBlob } from '@/lib/zipUtils'
+import { sanitizeFilename } from '@/lib/filenames'
 import { serializeDSL } from '@/lib/dsl'
 import { createBlankWorkspace } from '@/lib/templates'
 import { saveDSLFile } from '@/lib/fileIO'
@@ -38,6 +42,7 @@ interface WsEntry {
 }
 
 const ExportDialog = lazy(() => import('@/components/dialogs/ExportDialog'))
+const ExportProposalDialog = lazy(() => import('@/components/dialogs/ExportProposalDialog'))
 const CommandPalette = lazy(() => import('@/components/command-palette/CommandPalette'))
 const CreateViewDialog = lazy(() => import('@/components/views/CreateViewDialog'))
 const ScopePickerDialog = lazy(() => import('@/components/shared/ScopePickerDialog'))
@@ -52,6 +57,10 @@ export default function FloatingTopPill() {
 
   const commandPaletteOpen = useWorkspaceStore((s) => s.commandPaletteOpen)
   const showUndoRedo = useSettingsStore((s) => s.showUndoRedo)
+  const reactFlow = useReactFlow()
+
+  const exportProposalDialogOpen = useWorkspaceStore((s) => s.exportProposalDialogOpen)
+  const setExportProposalDialogOpen = useWorkspaceStore((s) => s.setExportProposalDialogOpen)
 
   const [exportDialogOpen, setExportDialogOpen] = useState(false)
   const [copyToast, setCopyToast] = useState<string | null>(null)
@@ -191,6 +200,29 @@ export default function FloatingTopPill() {
       setCopyToast(message)
       announce(message)
       setTimeout(() => setCopyToast(null), 4000)
+    }
+  }
+
+  async function handleExportProposal(selectedKeys: string[]) {
+    if (!workspace) return { exportedCount: 0, skipped: [], warnings: [] }
+    try {
+      const selectedKeySet = new Set(selectedKeys)
+      const views = getAllViews(workspace).filter((v) => selectedKeySet.has(v.key))
+      const { files, skipped, warnings } = await exportViewsForProposal({ reactFlow, workspace, views })
+      // Nothing captured (every view was empty/skipped) — don't drop a
+      // valid-but-empty zip into the user's Downloads folder; the dialog
+      // still gets the skip/warning reasons to explain why.
+      if (files.length > 0) {
+        const zip = await createZipBlob(files.map(({ filename, blob }) => ({ name: filename, data: blob })))
+        downloadBlob(zip, `${sanitizeFilename(wsName)}-proposal.zip`)
+      }
+      return { exportedCount: files.length, skipped, warnings }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Proposal export failed'
+      setCopyToast(message)
+      announce(message)
+      setTimeout(() => setCopyToast(null), 4000)
+      throw error
     }
   }
 
@@ -467,6 +499,7 @@ export default function FloatingTopPill() {
           <ExportDialog
             onExport={handleExport}
             onCopy={handleCopy}
+            onOpenProposal={() => { setExportDialogOpen(false); setExportProposalDialogOpen(true) }}
             onClose={() => setExportDialogOpen(false)}
           />
         </Suspense>
@@ -474,6 +507,16 @@ export default function FloatingTopPill() {
       {commandPaletteOpen && <Suspense fallback={<LoadingDot />}><CommandPalette /></Suspense>}
       </div>{/* end column */}
       </div>{/* end outer row */}
+
+      {exportProposalDialogOpen && (
+        <Suspense fallback={<LoadingDot />}>
+          <ExportProposalDialog
+            views={getAllViews(workspace)}
+            onExport={handleExportProposal}
+            onClose={() => setExportProposalDialogOpen(false)}
+          />
+        </Suspense>
+      )}
 
       {showCreateView && <Suspense fallback={<LoadingDot />}><CreateViewDialog onClose={() => setShowCreateView(false)} /></Suspense>}
       {/* CanvasSettingsDialog is rendered in FloatingToolRail via canvasSettingsOpen store state */}

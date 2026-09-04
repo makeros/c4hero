@@ -286,5 +286,7 @@ export interface WorkspaceState extends UndoState {
   setTeamFilterMode: (mode: 'any' | 'all') => void
   createViewDialogOpen: boolean
   setCreateViewDialogOpen: (open: boolean) => void
+  exportProposalDialogOpen: boolean
+  setExportProposalDialogOpen: (open: boolean) => void
   setPresentationMode: (on: boolean) => void
 }
