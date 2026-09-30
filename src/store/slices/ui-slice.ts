@@ -12,7 +12,7 @@ let batchUndo: Workspace[] = []
  *  pending-delete confirmation. Holds no workspace data. */
 export type UiSlice = Pick<WorkspaceState,
   | 'leftPanelOpen' | 'rightPanelOpen'
-  | 'searchOpen' | 'commandPaletteOpen'
+  | 'searchOpen' | 'commandPaletteOpen' | 'iconListDialogOpen' | 'setIconListDialogOpen'
   | 'canvasSettingsOpen' | 'canvasGuideOpen' | 'addElementPanelOpen' | 'highlighterOpenFacet'
   | 'viewsPanelOpen' | 'createViewDialogOpen'
   | 'exportProposalDialogOpen'
@@ -41,6 +41,7 @@ export const createUiSlice: StateCreator<
   rightPanelOpen: true,
   searchOpen: false,
   commandPaletteOpen: false,
+  iconListDialogOpen: false,
   canvasSettingsOpen: false,
   aiPanelOpen: false,
   aiPanelFeature: null,
@@ -71,6 +72,7 @@ export const createUiSlice: StateCreator<
   // closes the command palette so they don't stack.
   setSearchOpen: (open) => set({ searchOpen: open, commandPaletteOpen: false }),
   setCommandPaletteOpen: (open) => set({ commandPaletteOpen: open, searchOpen: false }),
+  setIconListDialogOpen: (open) => set({ iconListDialogOpen: open, commandPaletteOpen: false }),
   setCanvasSettingsOpen: (open) => set({ canvasSettingsOpen: open, commandPaletteOpen: false }),
   // The assistant lives in the bottom-left dock now, so opening it no longer
   // clears the selection / closes the inspector (they sit in different corners).

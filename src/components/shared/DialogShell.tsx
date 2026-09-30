@@ -87,7 +87,11 @@ export default function DialogShell({
         role="dialog"
         aria-label={ariaLabel}
         className={className}
-        style={{ position: 'fixed', top: 0, right: 0, bottom: 0, zIndex: 60, ...style }}
+        // Callers of "center"/"docked" may render this inside FloatingTopPill's
+        // pointer-events:none click-through wrapper — without an explicit
+        // "auto" here the panel is pointer-transparent, so clicks AND wheel
+        // events fall straight through to the canvas underneath.
+        style={{ position: 'fixed', top: 0, right: 0, bottom: 0, zIndex: 60, pointerEvents: 'auto', ...style }}
         onClick={(e) => e.stopPropagation()}
       >
         {children}
@@ -97,7 +101,7 @@ export default function DialogShell({
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center">
-      <div className="panel-backdrop absolute inset-0" onClick={handleClose} />
+      <div className="panel-backdrop absolute inset-0" style={{ pointerEvents: 'auto' }} onClick={handleClose} />
       <div
         ref={trapRef}
         role="dialog"
@@ -107,8 +111,12 @@ export default function DialogShell({
         // position: relative + z-index ensures the panel stacks above the
         // absolutely-positioned backdrop sibling. stopPropagation is a
         // defensive guard so clicks inside the panel never bubble to a
-        // potential handler on the outer container.
-        style={{ position: 'relative', zIndex: 1, ...style }}
+        // potential handler on the outer container. pointerEvents: 'auto' is
+        // needed because callers may render this inside FloatingTopPill's
+        // pointer-events:none click-through wrapper (see the "docked" branch
+        // above for the same issue) — without it, clicks and wheel events
+        // pass straight through to the canvas underneath.
+        style={{ position: 'relative', zIndex: 1, pointerEvents: 'auto', ...style }}
         onClick={(e) => e.stopPropagation()}
       >
         {children}

@@ -44,6 +44,7 @@ interface WsEntry {
 const ExportDialog = lazy(() => import('@/components/dialogs/ExportDialog'))
 const ExportProposalDialog = lazy(() => import('@/components/dialogs/ExportProposalDialog'))
 const CommandPalette = lazy(() => import('@/components/command-palette/CommandPalette'))
+const IconListDialog = lazy(() => import('@/components/command-palette/IconListDialog'))
 const CreateViewDialog = lazy(() => import('@/components/views/CreateViewDialog'))
 const ScopePickerDialog = lazy(() => import('@/components/shared/ScopePickerDialog'))
 
@@ -56,6 +57,8 @@ export default function FloatingTopPill() {
   const canRedo = useWorkspaceStore((s) => s.redoStack.length > 0)
 
   const commandPaletteOpen = useWorkspaceStore((s) => s.commandPaletteOpen)
+  const iconListDialogOpen = useWorkspaceStore((s) => s.iconListDialogOpen)
+  const setIconListDialogOpen = useWorkspaceStore((s) => s.setIconListDialogOpen)
   const showUndoRedo = useSettingsStore((s) => s.showUndoRedo)
   const reactFlow = useReactFlow()
 
@@ -505,6 +508,11 @@ export default function FloatingTopPill() {
         </Suspense>
       )}
       {commandPaletteOpen && <Suspense fallback={<LoadingDot />}><CommandPalette /></Suspense>}
+      {iconListDialogOpen && (
+        <Suspense fallback={<LoadingDot />}>
+          <IconListDialog onClose={() => setIconListDialogOpen(false)} />
+        </Suspense>
+      )}
       </div>{/* end column */}
       </div>{/* end outer row */}
 

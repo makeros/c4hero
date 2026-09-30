@@ -15,11 +15,25 @@ vi.mock('lucide-react', () => ({
   AlertTriangle: () => null,
   Settings: () => null,
   ChevronDown: () => null,
-  // elementMeta icons
+  // icon registry icons (elementMeta -> @/lib/icons/registry)
   UserRound: () => null,
   Globe: () => null,
   Box: () => null,
   Puzzle: () => null,
+  Database: () => null,
+  Monitor: () => null,
+  Zap: () => null,
+  GitMerge: () => null,
+  Smartphone: () => null,
+  HardDrive: () => null,
+  Circle: () => null,
+  Hexagon: () => null,
+  Diamond: () => null,
+  Bot: () => null,
+  Folder: () => null,
+  FolderOpen: () => null,
+  Server: () => null,
+  Boxes: () => null,
 }))
 
 function makeWs(): Workspace {

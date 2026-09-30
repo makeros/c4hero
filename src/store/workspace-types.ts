@@ -57,6 +57,7 @@ export interface WorkspaceState extends UndoState {
   rightPanelOpen: boolean
   searchOpen: boolean
   commandPaletteOpen: boolean
+  iconListDialogOpen: boolean
   pendingDelete: PendingDelete | null
   confirmDelete: (
     payload: string | { message: string; impact?: CascadeImpact },
@@ -255,6 +256,7 @@ export interface WorkspaceState extends UndoState {
   setRightPanelOpen: (open: boolean) => void
   setSearchOpen: (open: boolean) => void
   setCommandPaletteOpen: (open: boolean) => void
+  setIconListDialogOpen: (open: boolean) => void
   canvasSettingsOpen: boolean
   setCanvasSettingsOpen: (open: boolean) => void
   /** BYOK AI assistant panel. `aiPanelFeature` selects which feature tab opens. */

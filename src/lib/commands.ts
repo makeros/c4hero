@@ -4,7 +4,7 @@ import {
   MousePointer, LayoutDashboard, Maximize2, ZoomIn, ZoomOut,
   LayoutGrid, Search, Save, Settings, Monitor,
   Presentation, FolderOpen, Image, FileCode, Copy, Plus,
-  Highlighter, MousePointerClick, RotateCcw, CircleHelp, Sparkles, Package,
+  Highlighter, MousePointerClick, RotateCcw, CircleHelp, Sparkles, Package, Shapes,
 } from 'lucide-react'
 import { useWorkspaceStore, getCreatableTypes, getActiveView, getAllViews, isFocalScopeElement } from '@/store/workspace'
 import { computeCascadeImpact } from '@/store/workspace-helpers'
@@ -334,6 +334,14 @@ export function getCommands(reactFlow: ReactFlowInstance | null): Command[] {
       keywords: ['help', 'tutorial', 'walkthrough', 'how to', 'getting started'],
       when: () => !!store().workspace,
       execute: () => { store().setCanvasGuideOpen(true) },
+    },
+    {
+      id: 'list-icons',
+      label: 'List Available Icons',
+      category: 'view',
+      icon: Shapes,
+      keywords: ['icons', 'shapes', 'tags', 'legend', 'reference'],
+      execute: () => { store().setIconListDialogOpen(true) },
     },
 
     // ─── Navigation ──────────────────────────────────────
