@@ -112,6 +112,7 @@ beforeEach(() => {
     canvasGuideOpen: false,
     viewsPanelOpen: false,
     createViewDialogOpen: false,
+    exportProposalDialogOpen: false,
     highlighterOpenFacet: null,
     presentationMode: false,
     minimapEnabled: true,
@@ -456,6 +457,20 @@ describe('export commands', () => {
     vi.mocked(exportCanvasAsSVG).mockReturnValue(null)
     await command('export-svg').execute()
     expect(downloadFile).not.toHaveBeenCalled()
+  })
+
+  it('export-proposal is in the export category and opens the proposal dialog', () => {
+    const cmd = command('export-proposal')
+    expect(cmd.category).toBe('export')
+    expect(store().exportProposalDialogOpen).toBe(false)
+    cmd.execute()
+    expect(store().exportProposalDialogOpen).toBe(true)
+  })
+
+  it('export-proposal does nothing without a workspace', () => {
+    store().closeWorkspace()
+    command('export-proposal').execute()
+    expect(store().exportProposalDialogOpen).toBe(false)
   })
 })
 

@@ -6,6 +6,7 @@ import { scopeAllowsContainers } from '@/lib/scopeValidation'
 import DynamicStepsEditor from './DynamicStepsEditor'
 import DeploymentTopologyEditor from './DeploymentTopologyEditor'
 import { TYPE_ICONS, TYPE_COLORS, TYPE_LABELS } from '@/lib/elementMeta'
+import { getContainerIcon } from '@/lib/icons/registry'
 import {
   UserRound,
   Globe,
@@ -13,22 +14,16 @@ import {
   Puzzle,
   Plus,
   Search,
-  Database,
-  Zap,
-  GitMerge,
-  Smartphone,
-  HardDrive,
-  Monitor,
   ChevronDown,
 } from 'lucide-react'
 
 const CONTAINER_SUBTYPES = [
-  { key: 'web-app',  label: 'Web App',  tag: 'Web Application', icon: <Monitor size={13} /> },
-  { key: 'api',      label: 'API',       tag: 'Service',         icon: <Zap size={13} /> },
-  { key: 'database', label: 'Database',  tag: 'Database',        icon: <Database size={13} /> },
-  { key: 'queue',    label: 'Queue',     tag: 'Queue',           icon: <GitMerge size={13} /> },
-  { key: 'mobile',   label: 'Mobile',   tag: 'Mobile App',      icon: <Smartphone size={13} /> },
-  { key: 'files',    label: 'Files',     tag: 'File System',     icon: <HardDrive size={13} /> },
+  { key: 'web-app',  label: 'Web App',  tag: 'Web Application' },
+  { key: 'api',      label: 'API',       tag: 'Service' },
+  { key: 'database', label: 'Database',  tag: 'Database' },
+  { key: 'queue',    label: 'Queue',     tag: 'Queue' },
+  { key: 'mobile',   label: 'Mobile',   tag: 'Mobile App' },
+  { key: 'files',    label: 'Files',     tag: 'File System' },
 ]
 
 export default function AddElementPanel({ onClose }: { onClose: () => void }) {
@@ -287,22 +282,25 @@ export default function AddElementPanel({ onClose }: { onClose: () => void }) {
                     Common containers
                   </div>
                   <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                    {CONTAINER_SUBTYPES.map((sub) => (
-                      <SubtypeChip
-                        key={sub.key}
-                        icon={sub.icon}
-                        label={sub.label}
-                        onClick={() => {
-                          useWorkspaceStore.getState().addContainer(
-                            creatableTypes.canCreateContainer!,
-                            `New ${sub.label}`,
-                            undefined,
-                            sub.tag,
-                          )
-                          afterAdd()
-                        }}
-                      />
-                    ))}
+                    {CONTAINER_SUBTYPES.map((sub) => {
+                      const SubIcon = getContainerIcon([sub.tag])
+                      return (
+                        <SubtypeChip
+                          key={sub.key}
+                          icon={<SubIcon size={13} />}
+                          label={sub.label}
+                          onClick={() => {
+                            useWorkspaceStore.getState().addContainer(
+                              creatableTypes.canCreateContainer!,
+                              `New ${sub.label}`,
+                              undefined,
+                              sub.tag,
+                            )
+                            afterAdd()
+                          }}
+                        />
+                      )
+                    })}
                   </div>
                 </div>
               )}

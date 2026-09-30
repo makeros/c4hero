@@ -12,9 +12,10 @@ let batchUndo: Workspace[] = []
  *  pending-delete confirmation. Holds no workspace data. */
 export type UiSlice = Pick<WorkspaceState,
   | 'leftPanelOpen' | 'rightPanelOpen'
-  | 'searchOpen' | 'commandPaletteOpen'
+  | 'searchOpen' | 'commandPaletteOpen' | 'iconListDialogOpen' | 'setIconListDialogOpen'
   | 'canvasSettingsOpen' | 'canvasGuideOpen' | 'addElementPanelOpen' | 'highlighterOpenFacet'
   | 'viewsPanelOpen' | 'createViewDialogOpen'
+  | 'exportProposalDialogOpen'
   | 'pendingDelete' | 'confirmDelete' | 'cancelDelete'
   | 'presentationMode' | 'setPresentationMode'
   | 'minimapEnabled' | 'snapToGrid' | 'toggleMinimap' | 'toggleSnapToGrid'
@@ -25,6 +26,7 @@ export type UiSlice = Pick<WorkspaceState,
   | 'setCanvasSettingsOpen' | 'setCanvasGuideOpen' | 'setAddElementPanelOpen' | 'setHighlighterOpenFacet'
   | 'setViewsPanelOpen' | 'toggleViewsPanel'
   | 'setCreateViewDialogOpen'
+  | 'setExportProposalDialogOpen'
   | 'aiPanelOpen' | 'aiPanelFeature' | 'setAiPanelOpen' | 'clearAiPanelFeature' | 'aiSettingsOpen' | 'setAiSettingsOpen'
   | 'aiPanelBusy' | 'setAiPanelBusy' | 'batchApplying' | 'setBatchApplying'
 >
@@ -39,6 +41,7 @@ export const createUiSlice: StateCreator<
   rightPanelOpen: true,
   searchOpen: false,
   commandPaletteOpen: false,
+  iconListDialogOpen: false,
   canvasSettingsOpen: false,
   aiPanelOpen: false,
   aiPanelFeature: null,
@@ -54,6 +57,7 @@ export const createUiSlice: StateCreator<
   highlighterOpenFacet: null,
   viewsPanelOpen: false,
   createViewDialogOpen: false,
+  exportProposalDialogOpen: false,
   pendingDelete: null,
   presentationMode: false,
   minimapEnabled: true,
@@ -68,6 +72,7 @@ export const createUiSlice: StateCreator<
   // closes the command palette so they don't stack.
   setSearchOpen: (open) => set({ searchOpen: open, commandPaletteOpen: false }),
   setCommandPaletteOpen: (open) => set({ commandPaletteOpen: open, searchOpen: false }),
+  setIconListDialogOpen: (open) => set({ iconListDialogOpen: open, commandPaletteOpen: false }),
   setCanvasSettingsOpen: (open) => set({ canvasSettingsOpen: open, commandPaletteOpen: false }),
   // The assistant lives in the bottom-left dock now, so opening it no longer
   // clears the selection / closes the inspector (they sit in different corners).
@@ -121,6 +126,7 @@ export const createUiSlice: StateCreator<
   setViewsPanelOpen: (open) => set({ viewsPanelOpen: open }),
   toggleViewsPanel: () => set((s) => { s.viewsPanelOpen = !s.viewsPanelOpen }),
   setCreateViewDialogOpen: (open) => set({ createViewDialogOpen: open, commandPaletteOpen: false }),
+  setExportProposalDialogOpen: (open) => set({ exportProposalDialogOpen: open, commandPaletteOpen: false }),
 
   toggleMinimap: () => set((s) => { s.minimapEnabled = !s.minimapEnabled }),
   toggleSnapToGrid: () => set((s) => { s.snapToGrid = !s.snapToGrid }),

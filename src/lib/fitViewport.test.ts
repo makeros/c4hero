@@ -1,6 +1,6 @@
 import type { Node, ReactFlowInstance } from '@xyflow/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { CANVAS_FIT_CHROME_ATTRIBUTE, fitContentNodesToViewport, fitNodesToViewport, getCanvasFitInsets } from './fitViewport'
+import { CANVAS_FIT_CHROME_ATTRIBUTE, fitContentNodesToViewport, fitNodesToViewport, getCanvasFitInsets, getNodeBounds } from './fitViewport'
 
 function rect(left: number, top: number, width: number, height: number): DOMRect {
   return {
@@ -144,5 +144,23 @@ describe('fitViewport', () => {
     const zoom = viewport.zoom
     expect(viewport.x).toBeCloseTo(500 - 650 * zoom)
     expect(viewport.y).toBeCloseTo(392 - 450 * zoom)
+  })
+
+  it('includes minX/minY (top-left corner) alongside center/width/height', () => {
+    const bounds = getNodeBounds([
+      makeNode('a', 100, 50, 200, 100),
+      makeNode('b', 400, 300, 50, 50),
+    ])
+
+    // minX/minY: smallest node.position across nodes → (100, 50).
+    // maxX/maxY: largest position+size → (450, 350). width=350, height=300.
+    expect(bounds).toEqual({
+      minX: 100,
+      minY: 50,
+      centerX: 275,
+      centerY: 200,
+      width: 350,
+      height: 300,
+    })
   })
 })

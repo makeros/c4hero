@@ -1,11 +1,7 @@
 import { useState, useRef, useCallback } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import type { LucideIcon } from 'lucide-react'
-import {
-  ZoomIn,
-  Database, Circle, Hexagon, Diamond, UserRound, Bot, Folder, Globe, Smartphone,
-  AlertTriangle, Lock,
-} from 'lucide-react'
+import { ZoomIn, AlertTriangle, Lock } from 'lucide-react'
 import type { C4NodeData } from './types'
 import StatusDot from './StatusDot'
 import InlineName from './InlineName'
@@ -15,21 +11,7 @@ import { useWorkspaceStore } from '@/store/workspace'
 import { useSettingsStore } from '@/store/settings'
 import { useZoomLevel } from '@/hooks/useZoomLevel'
 import { pickHighlightReason } from '@/lib/highlight'
-
-/** Map Structurizr shape names to Lucide icons */
-const SHAPE_ICON_MAP: Record<string, LucideIcon> = {
-  Cylinder: Database,
-  Circle: Circle,
-  Ellipse: Circle,
-  Hexagon: Hexagon,
-  Diamond: Diamond,
-  Person: UserRound,
-  Robot: Bot,
-  Folder: Folder,
-  WebBrowser: Globe,
-  MobileDevicePortrait: Smartphone,
-  MobileDeviceLandscape: Smartphone,
-}
+import { SHAPE_ICON_MAP } from '@/lib/icons/registry'
 
 interface BaseC4NodeProps {
   data: C4NodeData

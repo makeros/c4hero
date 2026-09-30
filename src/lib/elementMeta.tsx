@@ -1,12 +1,9 @@
-import { UserRound, Globe, Box, Puzzle } from 'lucide-react'
 import type { ModelElement } from '@/types/model'
+import { TYPE_ICON_MAP } from '@/lib/icons/registry'
 
-export const TYPE_ICONS: Record<string, React.ReactNode> = {
-  person: <UserRound size={14} />,
-  softwareSystem: <Globe size={14} />,
-  container: <Box size={14} />,
-  component: <Puzzle size={14} />,
-}
+export const TYPE_ICONS: Record<string, React.ReactNode> = Object.fromEntries(
+  Object.entries(TYPE_ICON_MAP).map(([type, Icon]) => [type, <Icon size={14} />]),
+)
 
 export const TYPE_COLORS: Record<string, string> = {
   person: 'var(--color-type-person)',

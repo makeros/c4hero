@@ -17,6 +17,14 @@ vi.mock('lucide-react', () => ({
   HardDrive: () => null,
   Monitor: () => null,
   ChevronDown: () => null,
+  Circle: () => null,
+  Hexagon: () => null,
+  Diamond: () => null,
+  Bot: () => null,
+  Folder: () => null,
+  FolderOpen: () => null,
+  Server: () => null,
+  Boxes: () => null,
 }))
 
 function makeWs(): Workspace {

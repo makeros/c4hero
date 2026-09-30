@@ -7,6 +7,7 @@ function renderDialog(overrides: Partial<ComponentProps<typeof ExportDialog>> = 
   const props: ComponentProps<typeof ExportDialog> = {
     onExport: vi.fn().mockResolvedValue(undefined),
     onCopy: vi.fn().mockResolvedValue(undefined),
+    onOpenProposal: vi.fn(),
     onClose: vi.fn(),
     ...overrides,
   }
@@ -54,5 +55,11 @@ describe('ExportDialog', () => {
 
     await waitFor(() => expect(copyButton.hasAttribute('disabled')).toBe(false))
     expect(console.warn).toHaveBeenCalled()
+  })
+
+  it('the Proposal Package row calls onOpenProposal', () => {
+    const props = renderDialog()
+    fireEvent.click(screen.getByRole('button', { name: 'Select views to export' }))
+    expect(props.onOpenProposal).toHaveBeenCalledTimes(1)
   })
 })
