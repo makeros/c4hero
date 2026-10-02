@@ -5,6 +5,14 @@ import { useSettingsStore, type MinimapMode, type ColorTheme } from '@/store/set
 import { useWorkspaceStore } from '@/store/workspace'
 import DialogShell from '@/components/shared/DialogShell'
 import { THEMES, THEME_CANVAS_BACKGROUNDS } from '@/lib/themes'
+import type { LineStyle } from '@/types/model'
+
+const LINE_STYLE_OPTIONS: { value: LineStyle | ''; label: string }[] = [
+  { value: '', label: 'Default' },
+  { value: 'Curved', label: 'Curved' },
+  { value: 'Straight', label: 'Straight' },
+  { value: 'Orthogonal', label: 'Orthogonal' },
+]
 
 export default function CanvasSettingsDialog({ onClose }: { onClose: () => void }) {
   const settings = useSettingsStore()
@@ -136,6 +144,18 @@ export default function CanvasSettingsDialog({ onClose }: { onClose: () => void 
             <Toggle
               checked={settings.snapToGrid}
               onChange={(v) => settings.update({ snapToGrid: v })}
+            />
+          </SettingRow>
+
+          {/* Global line style */}
+          <SettingRow
+            label="Relationship line style"
+            description="Override the arrow shape for every relationship, regardless of its own style"
+          >
+            <SegmentedControl
+              options={LINE_STYLE_OPTIONS}
+              value={settings.globalLineStyle ?? ''}
+              onChange={(v) => settings.update({ globalLineStyle: (v || undefined) as LineStyle | undefined })}
             />
           </SettingRow>
 
