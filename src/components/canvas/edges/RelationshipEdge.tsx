@@ -61,7 +61,8 @@ function RelationshipEdge({
   const effectiveDescription = data?.stepDescription ?? relationship?.description
   const emphasized = !!selected
   const isAsync = relationship?.interactionStyle === 'Asynchronous'
-  const lineStyle = relationship?.lineStyle
+  const globalLineStyle = useSettingsStore((s) => s.globalLineStyle)
+  const lineStyle = globalLineStyle ?? relationship?.lineStyle
 
   const [sourceX, sourceY] = snapToNode(rawSrcX, rawSrcY, sourcePosition, SRC_OFFSET)
   const [targetX, targetY] = snapToNode(rawTgtX, rawTgtY, targetPosition, TGT_OFFSET)

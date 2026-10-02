@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { isRecord } from '@/lib/guards'
 import { readJSON, writeJSON } from '@/lib/safeStorage'
+import { isLineStyle, type LineStyle } from '@/types/model'
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -27,6 +28,10 @@ export interface AppSettings {
   colorTheme: ColorTheme
   canvasGuideDismissed: boolean
   alwaysExpandDetails: boolean
+  /** Global override for relationship line style, applied to every edge on the
+   *  canvas regardless of its own per-relationship `lineStyle`. `undefined`
+   *  ("Default") leaves each relationship's own style (or Curved) in effect. */
+  globalLineStyle: LineStyle | undefined
 }
 
 const DEFAULTS: AppSettings = {
@@ -38,6 +43,7 @@ const DEFAULTS: AppSettings = {
   colorTheme: 'readability',
   canvasGuideDismissed: false,
   alwaysExpandDetails: false,
+  globalLineStyle: undefined,
 }
 
 const STORAGE_KEY = 'c4hero.json'
@@ -80,6 +86,9 @@ function normalizeSettings(value: unknown): AppSettings {
     colorTheme: isColorTheme(source.colorTheme) ? source.colorTheme : DEFAULTS.colorTheme,
     canvasGuideDismissed: readBoolean(source, 'canvasGuideDismissed', DEFAULTS.canvasGuideDismissed),
     alwaysExpandDetails: readBoolean(source, 'alwaysExpandDetails', DEFAULTS.alwaysExpandDetails),
+    globalLineStyle: typeof source.globalLineStyle === 'string' && isLineStyle(source.globalLineStyle)
+      ? source.globalLineStyle
+      : DEFAULTS.globalLineStyle,
   }
 }
 
