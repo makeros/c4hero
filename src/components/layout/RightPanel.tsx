@@ -668,6 +668,10 @@ function RelationshipProperties({ relationship, onClose }: { relationship: Relat
           <FieldLabel>Tags</FieldLabel>
           <TagsTab tags={relationship.tags} onUpdate={(tags) => updateRelationship(relationship.id, { tags })} />
         </div>
+        <div>
+          <FieldLabel>Properties</FieldLabel>
+          <PropertiesTab properties={relationship.properties} onUpdate={(properties) => updateRelationship(relationship.id, { properties })} />
+        </div>
       </div>
     </div>
   )
@@ -829,6 +833,101 @@ function TagsTab({ tags, onUpdate, suggest }: { tags: string[]; onUpdate: (tags:
           {suggest.busy ? 'Suggesting…' : 'Suggest tags with AI'}
         </button>
       )}
+    </div>
+  )
+}
+
+// ─── Properties Tab ──────────────────────────────────────────────────
+
+// Common keys worth hinting at for implementation-relevant relationship
+// detail — API/contract shape, ownership & governance, non-functional
+// requirements — without forcing a rigid schema onto the freeform bag.
+const SUGGESTED_PROPERTY_KEYS = [
+  'protocol', 'authMethod', 'payloadFormat', 'endpoint',
+  'owner', 'dataClassification', 'ticket',
+  'sla', 'rateLimit', 'retryPolicy',
+]
+
+function PropertiesTab({ properties, onUpdate }: { properties: Record<string, string>; onUpdate: (properties: Record<string, string>) => void }) {
+  const [newKey, setNewKey] = useState('')
+  const [newValue, setNewValue] = useState('')
+  const entries = Object.entries(properties)
+
+  const addProperty = useCallback(() => {
+    const key = newKey.trim()
+    const value = newValue.trim()
+    if (!key || !value) return
+    onUpdate({ ...properties, [key]: value })
+    setNewKey('')
+    setNewValue('')
+  }, [newKey, newValue, properties, onUpdate])
+
+  const removeProperty = (key: string) => {
+    const next = { ...properties }
+    delete next[key]
+    onUpdate(next)
+  }
+
+  return (
+    <div className="space-y-3">
+      {entries.length > 0 && (
+        <div className="space-y-1.5">
+          {entries.map(([key, value]) => (
+            <div
+              key={key}
+              className="group flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-xs"
+              style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface-2)' }}
+            >
+              <span className="min-w-0 flex-1 truncate">
+                <span style={{ fontWeight: 600, color: 'var(--color-text-secondary)' }}>{key}</span>
+                <span style={{ color: 'var(--color-text-muted)' }}> · {value}</span>
+              </span>
+              <button
+                onClick={() => removeProperty(key)}
+                aria-label={`Remove property ${key}`}
+                className="opacity-0 transition-opacity group-hover:opacity-100"
+                style={{ color: 'var(--color-text-muted)', lineHeight: 1 }}
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="flex gap-1.5">
+        <input
+          type="text"
+          value={newKey}
+          onChange={(e) => setNewKey(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addProperty() } }}
+          placeholder="Key"
+          list="relationship-property-key-suggestions"
+          aria-label="Property key"
+          className="w-[38%] rounded-lg border px-2.5 py-1.5 text-xs outline-none"
+          style={{ background: 'var(--color-surface-2)', borderColor: 'var(--color-border)', color: 'var(--color-text-primary)' }}
+        />
+        <input
+          type="text"
+          value={newValue}
+          onChange={(e) => setNewValue(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addProperty() } }}
+          placeholder="Value"
+          aria-label="Property value"
+          className="flex-1 rounded-lg border px-2.5 py-1.5 text-xs outline-none"
+          style={{ background: 'var(--color-surface-2)', borderColor: 'var(--color-border)', color: 'var(--color-text-primary)' }}
+        />
+        <button
+          onClick={addProperty}
+          disabled={!newKey.trim() || !newValue.trim()}
+          className="btn-icon !min-h-7 !min-w-7 !p-1 disabled:opacity-30"
+          aria-label="Add property"
+        >
+          <Plus size={14} />
+        </button>
+      </div>
+      <datalist id="relationship-property-key-suggestions">
+        {SUGGESTED_PROPERTY_KEYS.map((key) => <option key={key} value={key} />)}
+      </datalist>
     </div>
   )
 }
