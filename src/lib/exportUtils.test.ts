@@ -187,6 +187,38 @@ describe('exportCanvasAsPNG', () => {
     expect(toBlob).toHaveBeenCalledOnce()
     expect(fetchSpy).not.toHaveBeenCalled()
   })
+
+  it('temporarily attaches a copy of the marker defs so arrowheads are captured, then cleans up', async () => {
+    document.body.innerHTML = `
+      <svg id="c4-marker-defs"><defs><marker id="c4-arrow"><path fill="var(--color-edge)" d="M0 0 L1 1 Z" /></marker></defs></svg>
+      <div class="react-flow__renderer"></div>
+    `
+    const renderer = document.querySelector('.react-flow__renderer') as HTMLElement
+    let capturedHasMarker = false
+    vi.mocked(toBlob).mockImplementation(async (node) => {
+      capturedHasMarker = !!(node as HTMLElement).querySelector('#c4-arrow')
+      return new Blob(['png'], { type: 'image/png' })
+    })
+
+    await exportCanvasAsPNG()
+
+    expect(capturedHasMarker).toBe(true)
+    expect(renderer.querySelector('#c4-arrow')).toBeNull()
+  })
+
+  it('cleans up the attached marker defs even if html-to-image throws', async () => {
+    document.body.innerHTML = `
+      <svg id="c4-marker-defs"><defs><marker id="c4-arrow"><path fill="var(--color-edge)" d="M0 0 L1 1 Z" /></marker></defs></svg>
+      <div class="react-flow__renderer"></div>
+    `
+    const renderer = document.querySelector('.react-flow__renderer') as HTMLElement
+    vi.mocked(toBlob).mockRejectedValue(new Error('boom'))
+
+    const blob = await exportCanvasAsPNG()
+
+    expect(blob).toBeNull()
+    expect(renderer.querySelector('#c4-arrow')).toBeNull()
+  })
 })
 
 describe('exportCanvasAsSVG', () => {
@@ -226,6 +258,19 @@ describe('exportCanvasAsSVG', () => {
     const svg = exportCanvasAsSVG()
 
     expect(svg).toContain('url(#c4-arrow)')
+  })
+
+  it('includes the marker <defs> so the url(#c4-arrow) reference actually resolves', () => {
+    document.body.innerHTML = `
+      <svg id="c4-marker-defs"><defs><marker id="c4-arrow"><path fill="var(--color-edge)" d="M0 0 L1 1 Z" /></marker></defs></svg>
+      <div class="react-flow__viewport">
+        <svg><path marker-end="url(#c4-arrow)" d="M0 0 L1 1"></path></svg>
+      </div>
+    `
+
+    const svg = exportCanvasAsSVG()
+
+    expect(svg).toContain('id="c4-arrow"')
   })
 
   it('inlines computed styles when cssText is empty', () => {

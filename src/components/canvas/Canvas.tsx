@@ -1187,7 +1187,7 @@ export default function Canvas() {
           />
         )}
         {/* Custom arrow marker — zero-size so it doesn't occupy canvas space */}
-        <svg style={MARKER_SVG_STYLE}>
+        <svg id="c4-marker-defs" style={MARKER_SVG_STYLE}>
           <defs>
             <marker
               id="c4-arrow"
