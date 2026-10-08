@@ -60,6 +60,11 @@ export async function exportCanvasAsPNG(theme: ExportTheme = 'dark'): Promise<Bl
   const renderer = document.querySelector('.react-flow__renderer') as HTMLElement | null
   if (!renderer) return null
 
+  // The marker <defs> (arrowheads/dots) live outside .react-flow__renderer, so
+  // html-to-image's internal clone never sees them unless we attach a copy here.
+  const markerDefs = cloneMarkerDefsWithResolvedColors()
+  if (markerDefs) renderer.appendChild(markerDefs)
+
   try {
     const { toBlob } = await import('html-to-image')
     const bg = bgForTheme(theme)
@@ -73,6 +78,8 @@ export async function exportCanvasAsPNG(theme: ExportTheme = 'dark'): Promise<Bl
     })
   } catch {
     return null
+  } finally {
+    if (markerDefs) renderer.removeChild(markerDefs)
   }
 }
 
@@ -85,6 +92,11 @@ export function exportCanvasAsSVG(theme: ExportTheme = 'dark'): string | null {
   sanitizeExportTree(cloned)
   inlineStyles(exportRoot, cloned)
   sanitizeExportTree(cloned)
+
+  // Marker <defs> live outside exportRoot as a sibling; include a copy so the
+  // edges' marker-start/marker-end url(#...) references resolve.
+  const markerDefs = cloneMarkerDefsWithResolvedColors()
+  if (markerDefs) cloned.appendChild(markerDefs)
 
   // For light theme, override CSS custom property values on the cloned root
   if (theme === 'light') {
@@ -123,6 +135,29 @@ export async function copyTextToClipboard(text: string): Promise<boolean> {
   } catch {
     return false
   }
+}
+
+/**
+ * Clone the canvas's marker <defs> (arrowheads/dots), baking each marker's
+ * `fill="var(--canvas-edge, ...)"` into its current resolved color. The
+ * exported document has no inherited CSS custom properties, so the raw
+ * var() reference would otherwise resolve to black (or nothing).
+ */
+function cloneMarkerDefsWithResolvedColors(): SVGElement | null {
+  const source = document.getElementById('c4-marker-defs')
+  if (!source) return null
+  const clone = source.cloneNode(true) as SVGElement
+
+  const originalFillEls = source.querySelectorAll('[fill]')
+  const clonedFillEls = clone.querySelectorAll('[fill]')
+  originalFillEls.forEach((el, i) => {
+    const fill = el.getAttribute('fill')
+    if (fill?.includes('var(')) {
+      clonedFillEls[i]?.setAttribute('fill', getComputedStyle(el).fill)
+    }
+  })
+
+  return clone
 }
 
 /** Recursively inline computed styles onto cloned elements */

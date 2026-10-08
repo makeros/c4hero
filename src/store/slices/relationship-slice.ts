@@ -110,6 +110,10 @@ export const createRelationshipSlice: StateCreator<
       const tagsChanged = patch.tags.length !== rel.tags.length || patch.tags.some((t, i) => t !== rel.tags[i])
       if (tagsChanged) { rel.tags = patch.tags; changed = true }
     }
+    if (patch.properties !== undefined) {
+      const propsChanged = JSON.stringify(patch.properties) !== JSON.stringify(rel.properties)
+      if (propsChanged) { rel.properties = patch.properties; changed = true }
+    }
     if (!changed) return
     pushUndoSnapshot(s)
   }),
