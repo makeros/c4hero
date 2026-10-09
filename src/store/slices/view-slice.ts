@@ -35,10 +35,11 @@ export const createViewSlice: StateCreator<
   [['zustand/immer', never]],
   [],
   ViewSlice
-> = (set) => ({
+> = (set, get) => ({
   layoutVersion: 0,
 
   addView: (type, scopeId, title, options) => {
+    if (get().readOnly) return ''
     const key = nanoid(8)
     set((s) => {
       if (!s.workspace) return
@@ -53,6 +54,7 @@ export const createViewSlice: StateCreator<
   },
 
   deleteView: (key) => set((s) => {
+    if (s.readOnly) return
     if (!s.workspace) return
     const ws = s.workspace
     let found = false
@@ -77,6 +79,7 @@ export const createViewSlice: StateCreator<
   }),
 
   renameView: (key, title) => set((s) => {
+    if (s.readOnly) return
     if (!s.workspace) return
     const ws = s.workspace
     for (const arrKey of VIEW_ARRAY_KEYS) {
@@ -91,6 +94,7 @@ export const createViewSlice: StateCreator<
   }),
 
   duplicateView: (key) => {
+    if (get().readOnly) return ''
     const newKey = nanoid(8)
     set((s) => {
       if (!s.workspace) return
@@ -119,6 +123,7 @@ export const createViewSlice: StateCreator<
   },
 
   updateNodePosition: (nodeId, x, y) => set((s) => {
+    if (s.readOnly) return
     if (!s.workspace || !s.activeViewKey) return
     for (const key of VIEW_ARRAY_KEYS) {
       const view = (s.workspace.views[key] ?? []).find(v => v.key === s.activeViewKey)
@@ -139,6 +144,7 @@ export const createViewSlice: StateCreator<
   }),
 
   updateNodePositions: (updates) => set((s) => {
+    if (s.readOnly) return
     if (!s.workspace || !s.activeViewKey) return
     const updateMap = new Map(updates.map(u => [u.id, u]))
     for (const key of VIEW_ARRAY_KEYS) {
@@ -176,6 +182,7 @@ export const createViewSlice: StateCreator<
   }),
 
   removeElementsFromView: (viewKey, ids) => set((s) => {
+    if (s.readOnly) return
     if (!s.workspace) return
     if (ids.length === 0) return
     const ws = s.workspace
@@ -199,6 +206,7 @@ export const createViewSlice: StateCreator<
   }),
 
   toggleElementInView: (viewKey, elementId) => set((s) => {
+    if (s.readOnly) return
     if (!s.workspace) return
     const ws = s.workspace
     const view = findViewHelper(ws, viewKey)
@@ -234,6 +242,7 @@ export const createViewSlice: StateCreator<
   }),
 
   setLayoutDirection: (viewKey, direction) => set((s) => {
+    if (s.readOnly) return
     if (!s.workspace) return
     const view = findViewHelper(s.workspace, viewKey)
     if (!view) return
@@ -247,6 +256,7 @@ export const createViewSlice: StateCreator<
   }),
 
   resetAndRelayout: (viewKey, direction) => set((s) => {
+    if (s.readOnly) return
     if (!s.workspace) return
     const view = findViewHelper(s.workspace, viewKey)
     if (!view) return
@@ -260,6 +270,7 @@ export const createViewSlice: StateCreator<
   }),
 
   setElementsLocked: (viewKey, ids, locked) => set((s) => {
+    if (s.readOnly) return
     if (!s.workspace || ids.length === 0) return
     const view = findViewHelper(s.workspace, viewKey)
     if (!view) return
@@ -280,6 +291,7 @@ export const createViewSlice: StateCreator<
   }),
 
   setViewLocked: (viewKey, locked) => set((s) => {
+    if (s.readOnly) return
     if (!s.workspace) return
     const view = findViewHelper(s.workspace, viewKey)
     if (!view) return
@@ -289,6 +301,7 @@ export const createViewSlice: StateCreator<
   }),
 
   unlockAllInView: (viewKey) => set((s) => {
+    if (s.readOnly) return
     if (!s.workspace) return
     const view = findViewHelper(s.workspace, viewKey)
     if (!view) return

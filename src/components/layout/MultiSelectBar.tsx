@@ -54,6 +54,7 @@ function quotedAttributeValue(value: string): string {
 }
 
 export default function MultiSelectBar() {
+  const readOnly = useWorkspaceStore((s) => s.readOnly)
   const selectedElementIds = useWorkspaceStore((s) => s.selectedElementIds)
   const addGroup = useWorkspaceStore((s) => s.addGroup)
   const selectGroup = useWorkspaceStore((s) => s.selectGroup)
@@ -414,106 +415,113 @@ export default function MultiSelectBar() {
           {count} selected
         </div>
 
-        {/* Align dropdown */}
-        <div style={{ position: 'relative', height: '100%', flexShrink: 0 }}>
-          <button className="hover-lift" style={{ ...btnStyle, paddingRight: 8 }} onClick={() => setAlignOpen(o => !o)} title="Align elements">
-            <AlignCenterVertical size={14} />
-            <span>Align</span>
-            <ChevronDown size={11} style={{ opacity: 0.6 }} />
-          </button>
-          {alignOpen && (
-            <>
-              <button
-                type="button"
-                aria-label="Close align menu"
-                onClick={() => setAlignOpen(false)}
-                style={{
-                  position: 'fixed', inset: 0, zIndex: 53,
-                  background: 'transparent', border: 'none', padding: 0, cursor: 'default',
-                }}
-              />
-              <div className="glass-flyout" style={{
-                position: 'absolute',
-                ...(alignOpenDownward
-                  ? { top: '100%', marginTop: 6 }
-                  : { bottom: '100%', marginBottom: 6 }),
-                left: '50%',
-                transform: 'translateX(-50%)',
-                zIndex: 54,
-                padding: 4,
-                minWidth: 170,
-              }}>
-                <div style={{ padding: '4px 10px 6px', fontSize: 'var(--text-xxs)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--color-text-muted)' }}>
-                  Align {count} elements
-                </div>
-                {alignMenuItems.map((item, i) => item === null ? (
-                  <div key={i} style={{ height: 1, background: 'var(--color-border)', margin: '2px 6px' }} />
-                ) : (
+        {/* Bulk mutation actions (align/distribute/straighten, lock, group, delete)
+            are all read-write operations on the workspace, so they're hidden as a
+            group in read-only mode — only the selection count badge above remains. */}
+        {!readOnly && (
+          <>
+            {/* Align dropdown */}
+            <div style={{ position: 'relative', height: '100%', flexShrink: 0 }}>
+              <button className="hover-lift" style={{ ...btnStyle, paddingRight: 8 }} onClick={() => setAlignOpen(o => !o)} title="Align elements">
+                <AlignCenterVertical size={14} />
+                <span>Align</span>
+                <ChevronDown size={11} style={{ opacity: 0.6 }} />
+              </button>
+              {alignOpen && (
+                <>
                   <button
-                    key={item.kind === 'align' ? item.mode : item.label}
-                    onClick={item.kind === 'align' ? () => handleAlign(item.mode) : item.onClick}
-                    className="flyout-item"
-                    disabled={item.kind === 'action' ? item.disabled : false}
-                  >
-                    <span className="flyout-item-icon">{item.icon}</span>
-                    <span className="flyout-item-label">{item.label}</span>
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
+                    type="button"
+                    aria-label="Close align menu"
+                    onClick={() => setAlignOpen(false)}
+                    style={{
+                      position: 'fixed', inset: 0, zIndex: 53,
+                      background: 'transparent', border: 'none', padding: 0, cursor: 'default',
+                    }}
+                  />
+                  <div className="glass-flyout" style={{
+                    position: 'absolute',
+                    ...(alignOpenDownward
+                      ? { top: '100%', marginTop: 6 }
+                      : { bottom: '100%', marginBottom: 6 }),
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    zIndex: 54,
+                    padding: 4,
+                    minWidth: 170,
+                  }}>
+                    <div style={{ padding: '4px 10px 6px', fontSize: 'var(--text-xxs)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--color-text-muted)' }}>
+                      Align {count} elements
+                    </div>
+                    {alignMenuItems.map((item, i) => item === null ? (
+                      <div key={i} style={{ height: 1, background: 'var(--color-border)', margin: '2px 6px' }} />
+                    ) : (
+                      <button
+                        key={item.kind === 'align' ? item.mode : item.label}
+                        onClick={item.kind === 'align' ? () => handleAlign(item.mode) : item.onClick}
+                        className="flyout-item"
+                        disabled={item.kind === 'action' ? item.disabled : false}
+                      >
+                        <span className="flyout-item-icon">{item.icon}</span>
+                        <span className="flyout-item-label">{item.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
 
-        {sep}
+            {sep}
 
-        {/* Lock / unlock */}
-        <button
-          className="hover-lift"
-          style={{ ...btnStyle, color: (allLocked || someLocked) ? 'var(--color-accent)' : btnStyle.color }}
-          aria-pressed={someLocked ? 'mixed' : allLocked}
-          title={allLocked
-            ? `Unlock ${count} elements`
-            : someLocked
-              ? `${lockedIds.size} of ${count} elements are locked — click to lock the rest`
-              : `Lock ${count} elements in place — Auto-arrange and dragging leave them alone`}
-          onClick={() => {
-            if (!activeViewKey) return
-            setElementsLocked(activeViewKey, selectedElementIds, !allLocked)
-          }}
-        >
-          {(allLocked || someLocked) ? <Lock size={14} /> : <LockOpen size={14} />}
-          <span>{allLocked ? 'Unlock' : 'Lock'}</span>
-        </button>
+            {/* Lock / unlock */}
+            <button
+              className="hover-lift"
+              style={{ ...btnStyle, color: (allLocked || someLocked) ? 'var(--color-accent)' : btnStyle.color }}
+              aria-pressed={someLocked ? 'mixed' : allLocked}
+              title={allLocked
+                ? `Unlock ${count} elements`
+                : someLocked
+                  ? `${lockedIds.size} of ${count} elements are locked — click to lock the rest`
+                  : `Lock ${count} elements in place — Auto-arrange and dragging leave them alone`}
+              onClick={() => {
+                if (!activeViewKey) return
+                setElementsLocked(activeViewKey, selectedElementIds, !allLocked)
+              }}
+            >
+              {(allLocked || someLocked) ? <Lock size={14} /> : <LockOpen size={14} />}
+              <span>{allLocked ? 'Unlock' : 'Lock'}</span>
+            </button>
 
-        {sep}
+            {sep}
 
-        {/* Group */}
-        <button className="hover-lift" style={btnStyle} title={`Group ${count} elements`}
-          onClick={() => { const id = addGroup('New Group', selectedElementIds); selectGroup(id) }}
-        >
-          <Layers size={14} />
-          <span>Group</span>
-        </button>
+            {/* Group */}
+            <button className="hover-lift" style={btnStyle} title={`Group ${count} elements`}
+              onClick={() => { const id = addGroup('New Group', selectedElementIds); selectGroup(id) }}
+            >
+              <Layers size={14} />
+              <span>Group</span>
+            </button>
 
-        {sep}
+            {sep}
 
-        {/* Delete from model */}
-        <button className="hover-lift" style={{ ...btnStyle, color: 'var(--color-error)', paddingRight: 12 }}
-          title={`Delete ${count} elements from the model`}
-          aria-label={`Delete ${count} elements from the model`}
-          onClick={() => {
-            if (!workspace || !activeViewKey) return
-            const ids = selectedElementIds.filter(
-              (id) => !isFocalScopeElement(workspace, activeViewKey, id),
-            )
-            if (ids.length === 0) return
-            const impact = computeCascadeImpact(workspace, ids)
-            confirmDelete({ message: formatImpactSummary(impact), impact }, () => deleteElements(ids))
-          }}
-        >
-          <Trash2 size={14} />
-          <span>Delete from model</span>
-        </button>
+            {/* Delete from model */}
+            <button className="hover-lift" style={{ ...btnStyle, color: 'var(--color-error)', paddingRight: 12 }}
+              title={`Delete ${count} elements from the model`}
+              aria-label={`Delete ${count} elements from the model`}
+              onClick={() => {
+                if (!workspace || !activeViewKey) return
+                const ids = selectedElementIds.filter(
+                  (id) => !isFocalScopeElement(workspace, activeViewKey, id),
+                )
+                if (ids.length === 0) return
+                const impact = computeCascadeImpact(workspace, ids)
+                confirmDelete({ message: formatImpactSummary(impact), impact }, () => deleteElements(ids))
+              }}
+            >
+              <Trash2 size={14} />
+              <span>Delete from model</span>
+            </button>
+          </>
+        )}
       </div>
     </div>
   )

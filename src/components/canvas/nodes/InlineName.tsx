@@ -7,6 +7,7 @@ export default memo(function InlineName({ elementId, name, lineClamp, textColor 
   const [draft, setDraft] = useState(name)
   const inputRef = useRef<HTMLInputElement>(null)
   const updateElement = useWorkspaceStore((s) => s.updateElement)
+  const readOnly = useWorkspaceStore((s) => s.readOnly)
 
   useEffect(() => {
     if (editing) {
@@ -57,13 +58,18 @@ export default memo(function InlineName({ elementId, name, lineClamp, textColor 
       className={`c4-node-name cursor-text${lineClamp ? ` line-clamp-${lineClamp}` : ''}`}
       style={textColor ? { color: textColor } : undefined}
       tabIndex={0}
-      onDoubleClick={(e) => { e.stopPropagation(); setEditing(true) }}
+      onDoubleClick={(e) => {
+        if (readOnly) return
+        e.stopPropagation()
+        setEditing(true)
+      }}
       onKeyDown={(e) => {
+        if (readOnly) return
         if (e.key === 'F2' || e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); setEditing(true) }
       }}
-      title="Double-click or press F2 to rename"
+      title={readOnly ? undefined : 'Double-click or press F2 to rename'}
       role="button"
-      aria-label={`${name} - press F2 to rename`}
+      aria-label={readOnly ? name : `${name} - press F2 to rename`}
     >
       {name}
     </div>

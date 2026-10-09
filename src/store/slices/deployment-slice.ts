@@ -40,8 +40,9 @@ export const createDeploymentSlice: StateCreator<
   [['zustand/immer', never]],
   [],
   DeploymentSlice
-> = (set) => ({
+> = (set, get) => ({
   addDeploymentEnvironment: (name) => {
+    if (get().readOnly) return false
     const trimmed = name.trim()
     if (!trimmed) return false
     let ok = false
@@ -60,6 +61,7 @@ export const createDeploymentSlice: StateCreator<
   },
 
   addDeploymentNode: (environment, parentNodeId) => {
+    if (get().readOnly) return ''
     const id = nanoid(8)
     let created = false
     set((s) => {
@@ -89,6 +91,7 @@ export const createDeploymentSlice: StateCreator<
   },
 
   addInfrastructureNode: (environment, hostNodeId) => {
+    if (get().readOnly) return ''
     const id = nanoid(8)
     let created = false
     set((s) => {
@@ -112,6 +115,7 @@ export const createDeploymentSlice: StateCreator<
   },
 
   addContainerInstance: (environment, hostNodeId, containerId) => {
+    if (get().readOnly) return ''
     const id = nanoid(8)
     let created = false
     set((s) => {
@@ -138,6 +142,7 @@ export const createDeploymentSlice: StateCreator<
   },
 
   addSoftwareSystemInstance: (environment, hostNodeId, softwareSystemId) => {
+    if (get().readOnly) return ''
     const id = nanoid(8)
     let created = false
     set((s) => {
@@ -162,6 +167,7 @@ export const createDeploymentSlice: StateCreator<
   },
 
   updateDeploymentElement: (environment, id, patch) => set((s) => {
+    if (s.readOnly) return
     if (!s.workspace) return
     const env = envByName(s.workspace, environment)
     if (!env) return
@@ -186,6 +192,7 @@ export const createDeploymentSlice: StateCreator<
   }),
 
   renameDeploymentElement: (environment, id, name) => set((s) => {
+    if (s.readOnly) return
     if (!s.workspace) return
     const env = envByName(s.workspace, environment)
     if (!env) return

@@ -119,6 +119,7 @@ function SuggestButton({ onClick, busy, multiline, title }: { onClick: () => voi
 
 function ElementProperties({ element, onClose }: { element: ModelElement; onClose: () => void }) {
   const [activeTab, setActiveTab] = useState<PanelTab>('properties')
+  const readOnly = useWorkspaceStore((s) => s.readOnly)
   const updateElement = useWorkspaceStore((s) => s.updateElement)
   const updateElementLive = useWorkspaceStore((s) => s.updateElementLive)
   const updateTech = useWorkspaceStore((s) => s.updateElementTechnology)
@@ -198,7 +199,7 @@ function ElementProperties({ element, onClose }: { element: ModelElement; onClos
              is added. The "remove from view" control stays regardless (touch-
              friendly parity with Backspace; hidden on the focal-scope element and
              when the element isn't in the active view) so AI users don't lose it. */}
-          {aiReady && (
+          {aiReady && !readOnly && (
             <button
               onClick={() => suggest(['description', 'technology', 'tags'])}
               disabled={busyField === 'all' || !hasMissing}
@@ -210,7 +211,7 @@ function ElementProperties({ element, onClose }: { element: ModelElement; onClos
               {busyField === 'all' ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
             </button>
           )}
-          {activeViewKey && appearsInActiveView && (
+          {activeViewKey && appearsInActiveView && !readOnly && (
             <button
               onClick={() => setElementsLocked(activeViewKey, [element.id], !isLocked)}
               className="btn-icon !min-h-7 !min-w-7 !p-1"
@@ -224,7 +225,7 @@ function ElementProperties({ element, onClose }: { element: ModelElement; onClos
               {isLocked ? <Lock size={14} /> : <LockOpen size={14} />}
             </button>
           )}
-          {!isFocal && activeViewKey && appearsInActiveView && (
+          {!isFocal && activeViewKey && appearsInActiveView && !readOnly && (
             <button
               onClick={() => {
                 if (!activeViewKey) return
@@ -238,7 +239,7 @@ function ElementProperties({ element, onClose }: { element: ModelElement; onClos
               <EyeOff size={14} />
             </button>
           )}
-          {isFocal ? (
+          {!readOnly && (isFocal ? (
             <button
               disabled
               aria-label="Delete from model (disabled — focal scope)"
@@ -262,7 +263,7 @@ function ElementProperties({ element, onClose }: { element: ModelElement; onClos
             >
               <Trash2 size={14} />
             </button>
-          )}
+          ))}
           <button onClick={onClose} className="btn-icon !min-h-7 !min-w-7 !p-1" aria-label="Close panel"><X size={14} /></button>
         </div>
       </div>
@@ -322,6 +323,7 @@ function ElementProperties({ element, onClose }: { element: ModelElement; onClos
                         type="button"
                         role="radio"
                         aria-checked={active}
+                        disabled={readOnly}
                         onClick={() => updateElement(element.id, { location: opt as Location })}
                         className="rounded-md border px-2 py-1.5 text-[11px] font-medium transition-colors"
                         style={{
@@ -329,7 +331,7 @@ function ElementProperties({ element, onClose }: { element: ModelElement; onClos
                           background: active ? 'var(--color-accent-active)' : 'var(--color-surface-2)',
                           borderColor: active ? 'var(--color-accent)' : 'var(--color-border)',
                           color: active ? 'var(--color-accent)' : 'var(--color-text-muted)',
-                          cursor: 'pointer',
+                          cursor: readOnly ? 'default' : 'pointer',
                         }}
                       >
                         {opt}
@@ -344,7 +346,7 @@ function ElementProperties({ element, onClose }: { element: ModelElement; onClos
                 <FieldLabel>Technology</FieldLabel>
                 <div style={{ position: 'relative' }}>
                   <TechnologyField value={tech ?? ''} scope="element" placeholder="e.g. React, PostgreSQL..." aria-label="Technology" onLiveChange={(v) => updateElementLive(element.id, { technology: v })} onCommit={(v) => updateTech(element.id, v)} />
-                  {aiReady && missingTech && <SuggestButton onClick={() => suggest(['technology'])} busy={busyField === 'technology'} title="Suggest a technology with AI" />}
+                  {aiReady && missingTech && !readOnly && <SuggestButton onClick={() => suggest(['technology'])} busy={busyField === 'technology'} title="Suggest a technology with AI" />}
                 </div>
               </div>
             )}
@@ -352,7 +354,7 @@ function ElementProperties({ element, onClose }: { element: ModelElement; onClos
               <FieldLabel>Description</FieldLabel>
               <div style={{ position: 'relative' }}>
                 <EditableField value={element.description ?? ''} placeholder="Describe this element..." aria-label="Description" onLiveChange={(v) => updateElementLive(element.id, { description: v || undefined })} onCommit={(v) => updateElement(element.id, { description: v || undefined })} multiline />
-                {aiReady && missingDesc && <SuggestButton onClick={() => suggest(['description'])} busy={busyField === 'description'} multiline title="Write a description with AI" />}
+                {aiReady && missingDesc && !readOnly && <SuggestButton onClick={() => suggest(['description'])} busy={busyField === 'description'} multiline title="Write a description with AI" />}
               </div>
             </div>
 
@@ -366,6 +368,7 @@ function ElementProperties({ element, onClose }: { element: ModelElement; onClos
                     <button
                       key={opt.label}
                       onClick={() => updateElement(element.id, { status: opt.value })}
+                      disabled={readOnly}
                       aria-pressed={active}
                       aria-label={`Status: ${opt.label}`}
                       className="flex items-center gap-1.5 rounded-md border px-2 py-1 text-[11px] font-medium transition-colors"
@@ -373,7 +376,7 @@ function ElementProperties({ element, onClose }: { element: ModelElement; onClos
                         background: active ? 'var(--color-accent-active)' : 'var(--color-surface-2)',
                         borderColor: active ? 'var(--color-accent)' : 'var(--color-border)',
                         color: active ? 'var(--color-accent)' : 'var(--color-text-muted)',
-                        cursor: 'pointer',
+                        cursor: readOnly ? 'default' : 'pointer',
                       }}
                     >
                       <span
@@ -447,7 +450,7 @@ function ElementProperties({ element, onClose }: { element: ModelElement; onClos
 
         {activeTab === 'relations' && <ElementRelationsTab elementId={element.id} />}
 
-        {activeTab === 'tags' && <TagsTab tags={element.tags} onUpdate={(tags) => updateElement(element.id, { tags })} suggest={aiReady ? { run: () => suggest(['tags']), busy: busyField === 'tags' } : undefined} />}
+        {activeTab === 'tags' && <TagsTab tags={element.tags} onUpdate={(tags) => updateElement(element.id, { tags })} suggest={aiReady && !readOnly ? { run: () => suggest(['tags']), busy: busyField === 'tags' } : undefined} />}
       </div>
     </div>
   )
@@ -509,6 +512,7 @@ function ViewLink({ viewKey, title }: { viewKey: string; title: string }) {
 
 function RelationshipProperties({ relationship, onClose }: { relationship: Relationship; onClose: () => void }) {
   const workspace = useWorkspaceStore((s) => s.workspace)
+  const readOnly = useWorkspaceStore((s) => s.readOnly)
   const updateRelationship = useWorkspaceStore((s) => s.updateRelationship)
   const deleteRelationship = useWorkspaceStore((s) => s.deleteRelationship)
   const confirmDelete = useWorkspaceStore((s) => s.confirmDelete)
@@ -531,15 +535,17 @@ function RelationshipProperties({ relationship, onClose }: { relationship: Relat
           <div className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>Relationship</div>
         </div>
         <div className="flex items-center gap-1">
-          <button
-            onClick={() => confirmDelete('Delete this relationship?', () => deleteRelationship(relationship.id))}
-            className="btn-icon !min-h-7 !min-w-7 !p-1"
-            aria-label="Delete relationship"
-            title="Delete relationship"
-            style={{ color: 'var(--color-error-text)' }}
-          >
-            <Trash2 size={14} />
-          </button>
+          {!readOnly && (
+            <button
+              onClick={() => confirmDelete('Delete this relationship?', () => deleteRelationship(relationship.id))}
+              className="btn-icon !min-h-7 !min-w-7 !p-1"
+              aria-label="Delete relationship"
+              title="Delete relationship"
+              style={{ color: 'var(--color-error-text)' }}
+            >
+              <Trash2 size={14} />
+            </button>
+          )}
           <button onClick={onClose} className="btn-icon !min-h-7 !min-w-7 !p-1" aria-label="Close panel"><X size={14} /></button>
         </div>
       </div>
@@ -562,6 +568,7 @@ function RelationshipProperties({ relationship, onClose }: { relationship: Relat
                 <button
                   key={option.label}
                   onClick={() => updateRelationship(relationship.id, { interactionStyle: option.value })}
+                  disabled={readOnly}
                   title={option.label}
                   aria-label={`Interaction style: ${option.label}`}
                   aria-pressed={active}
@@ -571,7 +578,7 @@ function RelationshipProperties({ relationship, onClose }: { relationship: Relat
                     background: active ? 'var(--color-accent-active)' : 'var(--color-surface-2)',
                     borderColor: active ? 'var(--color-accent)' : 'var(--color-border)',
                     color: active ? 'var(--color-accent)' : 'var(--color-text-muted)',
-                    cursor: 'pointer',
+                    cursor: readOnly ? 'default' : 'pointer',
                   }}
                 >
                   <svg width="28" height="12" viewBox="0 0 36 16" fill="none">
@@ -609,6 +616,7 @@ function RelationshipProperties({ relationship, onClose }: { relationship: Relat
                 <button
                   key={option.label}
                   onClick={() => updateRelationship(relationship.id, { lineStyle: option.value })}
+                  disabled={readOnly}
                   title={option.label}
                   aria-label={`Line style: ${option.label}`}
                   aria-pressed={active}
@@ -618,7 +626,7 @@ function RelationshipProperties({ relationship, onClose }: { relationship: Relat
                     background: active ? 'var(--color-accent-active)' : 'var(--color-surface-2)',
                     borderColor: active ? 'var(--color-accent)' : 'var(--color-border)',
                     color: active ? 'var(--color-accent)' : 'var(--color-text-muted)',
-                    cursor: 'pointer',
+                    cursor: readOnly ? 'default' : 'pointer',
                   }}
                 >
                   <svg width="28" height="12" viewBox="0 0 36 16" fill="none">
@@ -741,6 +749,7 @@ function ElementRelationsTab({ elementId }: { elementId: string }) {
 // ─── Tags Tab ────────────────────────────────────────────────────────
 
 function TagsTab({ tags, onUpdate, suggest }: { tags: string[]; onUpdate: (tags: string[]) => void; suggest?: { run: () => void; busy: boolean } }) {
+  const readOnly = useWorkspaceStore((s) => s.readOnly)
   const [newTag, setNewTag] = useState('')
   const noCustomTags = tags.every((t) => STRUCTURAL_TAGS.has(t))
 
@@ -784,7 +793,7 @@ function TagsTab({ tags, onUpdate, suggest }: { tags: string[]; onUpdate: (tags:
                 title={isBuiltIn ? 'Built-in type tag — cannot be removed' : undefined}
               >
                 {tag}
-                {!isBuiltIn && (
+                {!isBuiltIn && !readOnly && (
                   <button
                     onClick={() => removeTag(tag)}
                     aria-label={`Remove tag ${tag}`}
@@ -799,30 +808,32 @@ function TagsTab({ tags, onUpdate, suggest }: { tags: string[]; onUpdate: (tags:
           })}
         </div>
       )}
-      <div className="flex gap-1.5">
-        <input
-          type="text"
-          value={newTag}
-          onChange={(e) => setNewTag(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTag() } }}
-          placeholder="Add tag..."
-          className="flex-1 rounded-lg border px-2.5 py-1.5 text-xs outline-none"
-          style={{
-            background: 'var(--color-surface-2)',
-            borderColor: 'var(--color-border)',
-            color: 'var(--color-text-primary)',
-          }}
-        />
-        <button
-          onClick={addTag}
-          disabled={!newTag.trim()}
-          className="btn-icon !min-h-7 !min-w-7 !p-1 disabled:opacity-30"
-          aria-label="Add tag"
-        >
-          <Plus size={14} />
-        </button>
-      </div>
-      {suggest && noCustomTags && (
+      {!readOnly && (
+        <div className="flex gap-1.5">
+          <input
+            type="text"
+            value={newTag}
+            onChange={(e) => setNewTag(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTag() } }}
+            placeholder="Add tag..."
+            className="flex-1 rounded-lg border px-2.5 py-1.5 text-xs outline-none"
+            style={{
+              background: 'var(--color-surface-2)',
+              borderColor: 'var(--color-border)',
+              color: 'var(--color-text-primary)',
+            }}
+          />
+          <button
+            onClick={addTag}
+            disabled={!newTag.trim()}
+            className="btn-icon !min-h-7 !min-w-7 !p-1 disabled:opacity-30"
+            aria-label="Add tag"
+          >
+            <Plus size={14} />
+          </button>
+        </div>
+      )}
+      {suggest && noCustomTags && !readOnly && (
         <button
           onClick={suggest.run}
           disabled={suggest.busy}
@@ -849,6 +860,7 @@ const SUGGESTED_PROPERTY_KEYS = [
 ]
 
 function PropertiesTab({ properties, onUpdate }: { properties: Record<string, string>; onUpdate: (properties: Record<string, string>) => void }) {
+  const readOnly = useWorkspaceStore((s) => s.readOnly)
   const [newKey, setNewKey] = useState('')
   const [newValue, setNewValue] = useState('')
   const entries = Object.entries(properties)
@@ -882,49 +894,53 @@ function PropertiesTab({ properties, onUpdate }: { properties: Record<string, st
                 <span style={{ fontWeight: 600, color: 'var(--color-text-secondary)' }}>{key}</span>
                 <span style={{ color: 'var(--color-text-muted)' }}> · {value}</span>
               </span>
-              <button
-                onClick={() => removeProperty(key)}
-                aria-label={`Remove property ${key}`}
-                className="opacity-0 transition-opacity group-hover:opacity-100"
-                style={{ color: 'var(--color-text-muted)', lineHeight: 1 }}
-              >
-                ×
-              </button>
+              {!readOnly && (
+                <button
+                  onClick={() => removeProperty(key)}
+                  aria-label={`Remove property ${key}`}
+                  className="opacity-0 transition-opacity group-hover:opacity-100"
+                  style={{ color: 'var(--color-text-muted)', lineHeight: 1 }}
+                >
+                  ×
+                </button>
+              )}
             </div>
           ))}
         </div>
       )}
-      <div className="flex gap-1.5">
-        <input
-          type="text"
-          value={newKey}
-          onChange={(e) => setNewKey(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addProperty() } }}
-          placeholder="Key"
-          list="relationship-property-key-suggestions"
-          aria-label="Property key"
-          className="w-[38%] rounded-lg border px-2.5 py-1.5 text-xs outline-none"
-          style={{ background: 'var(--color-surface-2)', borderColor: 'var(--color-border)', color: 'var(--color-text-primary)' }}
-        />
-        <input
-          type="text"
-          value={newValue}
-          onChange={(e) => setNewValue(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addProperty() } }}
-          placeholder="Value"
-          aria-label="Property value"
-          className="flex-1 rounded-lg border px-2.5 py-1.5 text-xs outline-none"
-          style={{ background: 'var(--color-surface-2)', borderColor: 'var(--color-border)', color: 'var(--color-text-primary)' }}
-        />
-        <button
-          onClick={addProperty}
-          disabled={!newKey.trim() || !newValue.trim()}
-          className="btn-icon !min-h-7 !min-w-7 !p-1 disabled:opacity-30"
-          aria-label="Add property"
-        >
-          <Plus size={14} />
-        </button>
-      </div>
+      {!readOnly && (
+        <div className="flex gap-1.5">
+          <input
+            type="text"
+            value={newKey}
+            onChange={(e) => setNewKey(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addProperty() } }}
+            placeholder="Key"
+            list="relationship-property-key-suggestions"
+            aria-label="Property key"
+            className="w-[38%] rounded-lg border px-2.5 py-1.5 text-xs outline-none"
+            style={{ background: 'var(--color-surface-2)', borderColor: 'var(--color-border)', color: 'var(--color-text-primary)' }}
+          />
+          <input
+            type="text"
+            value={newValue}
+            onChange={(e) => setNewValue(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addProperty() } }}
+            placeholder="Value"
+            aria-label="Property value"
+            className="flex-1 rounded-lg border px-2.5 py-1.5 text-xs outline-none"
+            style={{ background: 'var(--color-surface-2)', borderColor: 'var(--color-border)', color: 'var(--color-text-primary)' }}
+          />
+          <button
+            onClick={addProperty}
+            disabled={!newKey.trim() || !newValue.trim()}
+            className="btn-icon !min-h-7 !min-w-7 !p-1 disabled:opacity-30"
+            aria-label="Add property"
+          >
+            <Plus size={14} />
+          </button>
+        </div>
+      )}
       <datalist id="relationship-property-key-suggestions">
         {SUGGESTED_PROPERTY_KEYS.map((key) => <option key={key} value={key} />)}
       </datalist>

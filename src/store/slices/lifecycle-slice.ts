@@ -13,6 +13,7 @@ export type LifecycleSlice = Pick<WorkspaceState,
   | 'loadWorkspace' | 'closeWorkspace' | 'updateWorkspaceMeta'
   | 'scopeViolations' | 'revalidateScope'
   | 'activeWorkspaceFilename' | 'setActiveWorkspaceFilename'
+  | 'readOnly' | 'setReadOnly'
 >
 
 export const createLifecycleSlice: StateCreator<
@@ -20,12 +21,15 @@ export const createLifecycleSlice: StateCreator<
   [['zustand/immer', never]],
   [],
   LifecycleSlice
-> = (set) => ({
+> = (set, get) => ({
   workspace: null,
   scopeViolations: [],
   activeWorkspaceFilename: null,
+  readOnly: false,
 
   setActiveWorkspaceFilename: (name) => set({ activeWorkspaceFilename: name }),
+
+  setReadOnly: (v) => set({ readOnly: v }),
 
   revalidateScope: () => set((s) => {
     s.scopeViolations = s.workspace ? validateScope(s.workspace) : []
@@ -65,7 +69,8 @@ export const createLifecycleSlice: StateCreator<
     })
   },
 
-  closeWorkspace: () =>
+  closeWorkspace: () => {
+    if (get().readOnly) return
     set({
       workspace: null,
       activeWorkspaceFilename: null,
@@ -85,9 +90,11 @@ export const createLifecycleSlice: StateCreator<
       redoStack: [],
       lastClearedHighlightFilters: null,
       scopeViolations: [],
-    }),
+    })
+  },
 
   updateWorkspaceMeta: (patch) => set((s) => {
+    if (s.readOnly) return
     if (!s.workspace) return
     const ws = s.workspace
     const willChange =

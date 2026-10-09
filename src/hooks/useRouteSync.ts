@@ -5,6 +5,7 @@ import { getCurrentDirHandle, restoreDirHandleByName, readDSLFile } from '@/lib/
 import { loadFromLocalStorage } from '@/lib/fileIO'
 import { createLogger } from '@/lib/logger'
 import { parseWorkspaceDocument } from '@/lib/workspaceDocument'
+import { getLockedWorkspace } from '@/lib/lockedWorkspace'
 
 const log = createLogger('routeSync')
 
@@ -109,6 +110,7 @@ export function useRefreshRedirect() {
     const match = location.pathname.match(/^\/collection\/([^/]+)\/([^/]+)(?:\/(.+))?$/)
     if (!match) return
     if (workspace) return
+    if (getLockedWorkspace()) return
 
     const collectionSlug = decodeURIComponent(match[1])
     const workspaceSlug = decodeURIComponent(match[2])

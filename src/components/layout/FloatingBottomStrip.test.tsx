@@ -39,6 +39,7 @@ function aliceTags() {
 
 beforeEach(() => {
   localStorage.clear()
+  useWorkspaceStore.getState().setReadOnly(false)
   useWorkspaceStore.getState().closeWorkspace()
 })
 
@@ -235,5 +236,62 @@ describe('TagManagerPanel', () => {
     fireEvent.click(screen.getByLabelText('Close'))
     fireEvent.click(screen.getByLabelText('Close tag manager'))
     expect(onClose).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('TagManagerPanel (readOnly)', () => {
+  it('hides the add-tag input/button when readOnly is true', () => {
+    useWorkspaceStore.getState().loadWorkspace(makeWs())
+    act(() => { useWorkspaceStore.setState({ readOnly: true }) })
+    render(<TagManagerPanel onClose={() => {}} />)
+    expect(screen.queryByPlaceholderText('New tag name...')).toBeNull()
+    expect(screen.queryByText('Add')).toBeNull()
+  })
+
+  it('renders custom tag names as plain text instead of rename inputs when readOnly is true', () => {
+    useWorkspaceStore.getState().loadWorkspace(makeWs())
+    act(() => { useWorkspaceStore.setState({ readOnly: true }) })
+    render(<TagManagerPanel onClose={() => {}} />)
+    expect(screen.queryByDisplayValue('Team A')).toBeNull()
+    expect(screen.getByText('Team A')).toBeTruthy()
+    expect(screen.queryByLabelText('Confirm rename')).toBeNull()
+  })
+
+  it('hides the remove-tag button when readOnly is true', () => {
+    useWorkspaceStore.getState().loadWorkspace(makeWs())
+    act(() => { useWorkspaceStore.setState({ readOnly: true }) })
+    render(<TagManagerPanel onClose={() => {}} />)
+    expect(screen.queryByLabelText('Remove tag "Team A" globally')).toBeNull()
+  })
+
+  it('still shows built-in tags and allows closing the panel when readOnly is true', () => {
+    useWorkspaceStore.getState().loadWorkspace(makeWs())
+    act(() => { useWorkspaceStore.setState({ readOnly: true }) })
+    const onClose = vi.fn()
+    render(<TagManagerPanel onClose={onClose} />)
+    expect(screen.getByText('Person')).toBeTruthy()
+    fireEvent.click(screen.getByLabelText('Close tag manager'))
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('disables every control in the inline style editor and hides "Remove style" when readOnly is true', () => {
+    useWorkspaceStore.getState().loadWorkspace(makeWs())
+    act(() => { useWorkspaceStore.setState({ readOnly: true }) })
+    render(<TagManagerPanel onClose={() => {}} />)
+    fireEvent.click(screen.getAllByLabelText('Edit style')[2]) // Person — has an existing style
+
+    for (const input of screen.getAllByPlaceholderText('#hex or name')) {
+      expect((input as HTMLInputElement).disabled).toBe(true)
+    }
+    for (const select of screen.getAllByRole('combobox')) {
+      expect((select as HTMLSelectElement).disabled).toBe(true)
+    }
+    expect((screen.getByRole('slider') as HTMLInputElement).disabled).toBe(true)
+    expect((screen.getByPlaceholderText('Default') as HTMLInputElement).disabled).toBe(true)
+    expect(screen.queryByText('Remove style')).toBeNull()
+
+    // Mutating actions remain no-ops even if somehow triggered.
+    fireEvent.change(screen.getAllByPlaceholderText('#hex or name')[0], { target: { value: '#ff0000' } })
+    expect(elementStyles().find((s) => s.tag === 'Person')!.background).toBe('#123456')
   })
 })

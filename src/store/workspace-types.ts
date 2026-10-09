@@ -104,6 +104,11 @@ export interface WorkspaceState extends UndoState {
   scopeViolations: ScopeViolation[]
   revalidateScope: () => void
 
+  // Read-only lock (locked viewer builds). Set once at startup via setReadOnly;
+  // every content-mutating action guards on this and no-ops when true.
+  readOnly: boolean
+  setReadOnly: (v: boolean) => void
+
   // Workspace lifecycle
   loadWorkspace: (workspace: Workspace) => void
   closeWorkspace: () => void

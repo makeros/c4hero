@@ -32,6 +32,7 @@ export const createElementSlice: StateCreator<
   ElementSlice
 > = (set, get) => ({
   addPerson: (name, position, location) => {
+    if (get().readOnly) return ''
     const id = nanoid(8)
     set((s) => {
       if (!s.workspace) return
@@ -53,6 +54,7 @@ export const createElementSlice: StateCreator<
   },
 
   addSoftwareSystem: (name, position, location) => {
+    if (get().readOnly) return ''
     const id = nanoid(8)
     set((s) => {
       if (!s.workspace) return
@@ -74,6 +76,7 @@ export const createElementSlice: StateCreator<
   },
 
   addContainer: (systemId, name, position, extraTag) => {
+    if (get().readOnly) return ''
     const id = nanoid(8)
     let added = false
     set((s) => {
@@ -118,6 +121,7 @@ export const createElementSlice: StateCreator<
   },
 
   addComponent: (containerId, name, position) => {
+    if (get().readOnly) return ''
     const id = nanoid(8)
     let added = false
     set((s) => {
@@ -156,31 +160,33 @@ export const createElementSlice: StateCreator<
   },
 
   updateElement: (id, patch) => set((s) => {
-    if (!s.workspace) return
+    if (s.readOnly || !s.workspace) return
     // applyElementPatch is no-op-safe; only push undo if something actually changed.
     if (!applyElementPatch(s.workspace, id, patch)) return
     pushUndoSnapshot(s)
   }),
 
   updateElementLive: (id, patch) => set((s) => {
-    if (!s.workspace) return
+    if (s.readOnly || !s.workspace) return
     // Mutate the draft directly — Immer detects no-op patches and skips
     // state replacement when applyElementPatch reports no change. No undo push.
     applyElementPatch(s.workspace, id, patch)
   }),
 
   updateElementTechnology: (id, technology) => set((s) => {
-    if (!s.workspace) return
+    if (s.readOnly || !s.workspace) return
     if (!applyElementPatch(s.workspace, id, { technology })) return
     pushUndoSnapshot(s)
   }),
 
   deleteElement: (id) => {
+    if (get().readOnly) return
     // Delegate to batch implementation
     get().deleteElements([id])
   },
 
   deleteElements: (ids) => {
+    if (get().readOnly) return
     if (ids.length === 0) return
     set((s) => {
       if (!s.workspace) return
@@ -200,6 +206,7 @@ export const createElementSlice: StateCreator<
   },
 
   duplicateElements: (ids) => {
+    if (get().readOnly) return []
     let createdIds: string[] = []
     set((s) => {
       if (!s.workspace || !s.activeViewKey) return

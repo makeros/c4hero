@@ -7,6 +7,7 @@ import { FieldLabel, EditableField } from './fields'
 
 export default function GroupProperties({ group, onClose }: { group: Group; onClose: () => void }) {
   const workspace = useWorkspaceStore((s) => s.workspace)
+  const readOnly = useWorkspaceStore((s) => s.readOnly)
   const updateGroup = useWorkspaceStore((s) => s.updateGroup)
   const deleteGroup = useWorkspaceStore((s) => s.deleteGroup)
   const confirmDelete = useWorkspaceStore((s) => s.confirmDelete)
@@ -50,15 +51,17 @@ export default function GroupProperties({ group, onClose }: { group: Group; onCl
         <span style={{ fontSize: 'var(--text-xs)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--color-accent)', flex: 1 }}>
           Group
         </span>
-        <button
-          onClick={() => confirmDelete(`Delete group "${group.name}"?`, () => { deleteGroup(group.id); onClose() })}
-          className="btn-icon !min-h-7 !min-w-7 !p-1"
-          title="Delete group"
-          aria-label="Delete group"
-          style={{ color: 'var(--color-text-muted)' }}
-        >
-          <Trash2 size={14} />
-        </button>
+        {!readOnly && (
+          <button
+            onClick={() => confirmDelete(`Delete group "${group.name}"?`, () => { deleteGroup(group.id); onClose() })}
+            className="btn-icon !min-h-7 !min-w-7 !p-1"
+            title="Delete group"
+            aria-label="Delete group"
+            style={{ color: 'var(--color-text-muted)' }}
+          >
+            <Trash2 size={14} />
+          </button>
+        )}
         <button onClick={onClose} className="btn-icon !min-h-7 !min-w-7 !p-1" title="Close" aria-label="Close panel">
           <X size={14} />
         </button>
@@ -96,14 +99,16 @@ export default function GroupProperties({ group, onClose }: { group: Group; onCl
                   <span style={{ flex: 1, fontSize: 'var(--text-sm)', color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {el.name}
                   </span>
-                  <button
-                    onClick={() => removeMember(el.id)}
-                    style={{ color: 'var(--color-text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 2, display: 'flex', flexShrink: 0 }}
-                    title="Remove from group"
-                    aria-label={`Remove ${el.name} from group`}
-                  >
-                    <X size={11} />
-                  </button>
+                  {!readOnly && (
+                    <button
+                      onClick={() => removeMember(el.id)}
+                      style={{ color: 'var(--color-text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 2, display: 'flex', flexShrink: 0 }}
+                      title="Remove from group"
+                      aria-label={`Remove ${el.name} from group`}
+                    >
+                      <X size={11} />
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
@@ -111,61 +116,63 @@ export default function GroupProperties({ group, onClose }: { group: Group; onCl
         </div>
 
         {/* Add members */}
-        <div>
-          <FieldLabel>Add member</FieldLabel>
-          <input
-            type="text"
-            value={addSearch}
-            onChange={(e) => setAddSearch(e.target.value)}
-            placeholder="Search elements..."
-            className="w-full rounded-lg border px-3 py-2 text-sm outline-none"
-            style={{
-              background: 'var(--color-surface-2)',
-              borderColor: 'var(--color-border)',
-              color: 'var(--color-text-primary)',
-              marginBottom: candidates.length > 0 ? 6 : 0,
-            }}
-          />
-          {candidates.length > 0 && (
-            <div style={{
-              maxHeight: 160,
-              overflowY: 'auto',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 1,
-              border: '1px solid var(--color-border)',
-              borderRadius: 'var(--radius-sm)',
-              background: 'var(--color-surface-1)',
-              padding: 4,
-            }}>
-              {candidates.slice(0, 20).map(el => (
-                <button
-                  key={el.id}
-                  onClick={() => addMember(el.id)}
-                  className="hover-surface-2"
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 6,
-                    padding: '5px 8px',
-                    borderRadius: 5,
-                    fontSize: 'var(--text-sm)',
-                    color: 'var(--color-text-secondary)',
-                    background: 'transparent',
-                    border: 'none',
-                    cursor: 'pointer',
-                    textAlign: 'left',
-                    transition: 'background 0.12s',
-                  }}
-                >
-                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: TYPE_COLORS[el.type] ?? 'var(--color-accent)', flexShrink: 0 }} />
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{el.name}</span>
-                  <Plus size={11} style={{ marginLeft: 'auto', flexShrink: 0, color: 'var(--color-text-muted)' }} />
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        {!readOnly && (
+          <div>
+            <FieldLabel>Add member</FieldLabel>
+            <input
+              type="text"
+              value={addSearch}
+              onChange={(e) => setAddSearch(e.target.value)}
+              placeholder="Search elements..."
+              className="w-full rounded-lg border px-3 py-2 text-sm outline-none"
+              style={{
+                background: 'var(--color-surface-2)',
+                borderColor: 'var(--color-border)',
+                color: 'var(--color-text-primary)',
+                marginBottom: candidates.length > 0 ? 6 : 0,
+              }}
+            />
+            {candidates.length > 0 && (
+              <div style={{
+                maxHeight: 160,
+                overflowY: 'auto',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 1,
+                border: '1px solid var(--color-border)',
+                borderRadius: 'var(--radius-sm)',
+                background: 'var(--color-surface-1)',
+                padding: 4,
+              }}>
+                {candidates.slice(0, 20).map(el => (
+                  <button
+                    key={el.id}
+                    onClick={() => addMember(el.id)}
+                    className="hover-surface-2"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      padding: '5px 8px',
+                      borderRadius: 5,
+                      fontSize: 'var(--text-sm)',
+                      color: 'var(--color-text-secondary)',
+                      background: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      transition: 'background 0.12s',
+                    }}
+                  >
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: TYPE_COLORS[el.type] ?? 'var(--color-accent)', flexShrink: 0 }} />
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{el.name}</span>
+                    <Plus size={11} style={{ marginLeft: 'auto', flexShrink: 0, color: 'var(--color-text-muted)' }} />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )

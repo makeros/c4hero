@@ -182,6 +182,34 @@ const GLOBAL_SHORTCUTS: Record<string, KeyHandler> = {
   '0': (_store, rf) => fitContentNodesToViewport(rf),
 }
 
+/**
+ * GLOBAL_SHORTCUTS combos that mutate the workspace (directly or via a
+ * confirm dialog that leads to a mutation), persist it to disk, or open a
+ * panel whose purpose is to create/replace content. These are no-ops in
+ * read-only mode — some of the underlying store actions already guard
+ * themselves, but `loadWorkspace` (mod+o), the raw file save (mod+s),
+ * `confirmDelete` (Backspace/Delete variants) and `setAddElementPanelOpen`
+ * ('a') do not, so the guard must live here too.
+ */
+const READONLY_BLOCKED_SHORTCUTS = new Set([
+  'mod+o',
+  'mod+s',
+  'mod+z',
+  'mod+shift+z',
+  'mod+d',
+  'Backspace',
+  'Delete',
+  'shift+Backspace',
+  'shift+Delete',
+  'shift+G',
+  'shift+P',
+  'shift+S',
+  'shift+C',
+  'shift+O',
+  'a',
+  'mod+shift+l',
+])
+
 function getKeyCombo(e: KeyboardEvent): string {
   const parts: string[] = []
   if (e.metaKey || e.ctrlKey) parts.push('mod')
@@ -254,6 +282,7 @@ export function useKeyboardShortcuts() {
       const handler = GLOBAL_SHORTCUTS[combo]
       if (handler) {
         e.preventDefault()
+        if (store.readOnly && READONLY_BLOCKED_SHORTCUTS.has(combo)) return
         handler(store, rf)
       }
     }

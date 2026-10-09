@@ -196,4 +196,33 @@ describe('ViewSwitcherPanel', () => {
     fireEvent.click(screen.getByLabelText('Close view switcher'))
     expect(onClose).toHaveBeenCalledTimes(1)
   })
+
+  it('hides the "New view" footer when readOnly is true', () => {
+    useWorkspaceStore.getState().loadWorkspace(makeWs())
+    render(<ViewSwitcherPanel onClose={noop} onShowCreateView={noop} readOnly />)
+    expect(screen.queryByText('New view')).toBeNull()
+  })
+
+  it('still switches the active view via an existing row when readOnly is true', () => {
+    useWorkspaceStore.getState().loadWorkspace(makeWs())
+    const onClose = vi.fn()
+    render(<ViewSwitcherPanel onClose={onClose} onShowCreateView={noop} readOnly />)
+    fireEvent.click(screen.getByText('API Context'))
+    expect(useWorkspaceStore.getState().activeViewKey).toBe('ctx')
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('hides the rename, duplicate, and delete controls on every row when readOnly is true', () => {
+    useWorkspaceStore.getState().loadWorkspace(makeWs())
+    render(<ViewSwitcherPanel onClose={noop} onShowCreateView={noop} readOnly />)
+    expect(screen.queryByLabelText('Rename view Overview')).toBeNull()
+    expect(screen.queryByLabelText('Rename view Second Map')).toBeNull()
+    expect(screen.queryByLabelText('Rename view API Context')).toBeNull()
+    expect(screen.queryByLabelText('Duplicate view Overview')).toBeNull()
+    expect(screen.queryByLabelText('Duplicate view Second Map')).toBeNull()
+    expect(screen.queryByLabelText('Duplicate view API Context')).toBeNull()
+    expect(screen.queryByLabelText('Delete view Second Map')).toBeNull()
+    expect(screen.queryByLabelText('Delete view API Context')).toBeNull()
+    expect(screen.queryByLabelText('Cannot delete last view')).toBeNull()
+  })
 })

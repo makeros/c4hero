@@ -29,6 +29,7 @@ export function TagManagerPanel({
   onClose: () => void
 }) {
   const workspace = useWorkspaceStore((s) => s.workspace)
+  const readOnly = useWorkspaceStore((s) => s.readOnly)
   const renameTag = useWorkspaceStore((s) => s.renameTag)
   const removeTagGlobal = useWorkspaceStore((s) => s.removeTagGlobal)
   const updateElementStyle = useWorkspaceStore((s) => s.updateElementStyle)
@@ -128,6 +129,7 @@ export function TagManagerPanel({
                         tag={tag}
                         style={getStyleForTag(tag)}
                         builtIn
+                        readOnly={readOnly}
                         editingStyle={editingStyleFor === tag}
                         onEditStyle={() => setEditingStyleFor(editingStyleFor === tag ? null : tag)}
                         onCloseStyle={() => setEditingStyleFor(null)}
@@ -145,6 +147,7 @@ export function TagManagerPanel({
                         key={tag}
                         tag={tag}
                         style={getStyleForTag(tag)}
+                        readOnly={readOnly}
                         editingStyle={editingStyleFor === tag}
                         onEditStyle={() => setEditingStyleFor(editingStyleFor === tag ? null : tag)}
                         onCloseStyle={() => setEditingStyleFor(null)}
@@ -160,46 +163,48 @@ export function TagManagerPanel({
         </div>
 
         {/* Add tag */}
-        <div style={{
-          borderTop: '1px solid var(--color-border)',
-          padding: '8px 10px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 6,
-        }}>
-          <input
-            ref={newTagInputRef}
-            type="text"
-            value={newTagValue}
-            onChange={(e) => setNewTagValue(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') { e.preventDefault(); handleAddTag() }
-              if (e.key === 'Escape') setNewTagValue('')
-            }}
-            placeholder="New tag name..."
-            style={{
-              flex: 1, height: 30, padding: '0 10px',
-              borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)',
-              background: 'var(--color-surface-2)', color: 'var(--color-text-primary)',
-              fontSize: 'var(--text-xs)', outline: 'none',
-            }}
-          />
-          <button
-            onClick={handleAddTag}
-            disabled={!newTagValue.trim()}
-            style={{
-              height: 30, padding: '0 12px', borderRadius: 'var(--radius-sm)',
-              border: '1px solid var(--color-border)',
-              background: newTagValue.trim() ? 'var(--color-accent)' : 'var(--color-surface-2)',
-              color: newTagValue.trim() ? 'var(--color-bg-primary)' : 'var(--color-text-muted)',
-              fontSize: 'var(--text-xs)', fontWeight: 600, cursor: newTagValue.trim() ? 'pointer' : 'default',
-              display: 'flex', alignItems: 'center', gap: 4, transition: 'background 0.12s',
-            }}
-          >
-            <Plus size={11} />
-            Add
-          </button>
-        </div>
+        {!readOnly && (
+          <div style={{
+            borderTop: '1px solid var(--color-border)',
+            padding: '8px 10px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+          }}>
+            <input
+              ref={newTagInputRef}
+              type="text"
+              value={newTagValue}
+              onChange={(e) => setNewTagValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') { e.preventDefault(); handleAddTag() }
+                if (e.key === 'Escape') setNewTagValue('')
+              }}
+              placeholder="New tag name..."
+              style={{
+                flex: 1, height: 30, padding: '0 10px',
+                borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)',
+                background: 'var(--color-surface-2)', color: 'var(--color-text-primary)',
+                fontSize: 'var(--text-xs)', outline: 'none',
+              }}
+            />
+            <button
+              onClick={handleAddTag}
+              disabled={!newTagValue.trim()}
+              style={{
+                height: 30, padding: '0 12px', borderRadius: 'var(--radius-sm)',
+                border: '1px solid var(--color-border)',
+                background: newTagValue.trim() ? 'var(--color-accent)' : 'var(--color-surface-2)',
+                color: newTagValue.trim() ? 'var(--color-bg-primary)' : 'var(--color-text-muted)',
+                fontSize: 'var(--text-xs)', fontWeight: 600, cursor: newTagValue.trim() ? 'pointer' : 'default',
+                display: 'flex', alignItems: 'center', gap: 4, transition: 'background 0.12s',
+              }}
+            >
+              <Plus size={11} />
+              Add
+            </button>
+          </div>
+        )}
       </div>
     </>
   )
@@ -208,12 +213,13 @@ export function TagManagerPanel({
 // ─── Tag Row ──────────────────────────────────────────────────────────
 
 function TagRow({
-  tag, style, builtIn, editingStyle,
+  tag, style, builtIn, readOnly, editingStyle,
   onEditStyle, onCloseStyle, onRename, onDelete,
 }: {
   tag: string
   style: ElementStyle | undefined
   builtIn?: boolean
+  readOnly?: boolean
   editingStyle: boolean
   onEditStyle: () => void
   onCloseStyle: () => void
@@ -247,8 +253,8 @@ function TagRow({
           border: '1px solid var(--glass-overlay-md)',
         }} />
 
-        {/* Tag name: read-only label for built-in, editable input for custom */}
-        {builtIn ? (
+        {/* Tag name: read-only label for built-in (or when readOnly), editable input for custom */}
+        {builtIn || readOnly ? (
           <span style={{
             flex: 1, height: 26, padding: '0 7px',
             display: 'flex', alignItems: 'center',
@@ -315,8 +321,8 @@ function TagRow({
           <Palette size={11} />
         </button>
 
-        {/* Delete button (hidden for built-in type tags) */}
-        {!builtIn && (
+        {/* Delete button (hidden for built-in type tags, and in read-only mode) */}
+        {!builtIn && !readOnly && (
           <button
             onClick={onDelete}
             className="hover-danger"
@@ -352,6 +358,7 @@ function TagStyleEditor({ tag, style, onClose }: {
 }) {
   const updateElementStyle = useWorkspaceStore((s) => s.updateElementStyle)
   const removeElementStyle = useWorkspaceStore((s) => s.removeElementStyle)
+  const readOnly = useWorkspaceStore((s) => s.readOnly)
 
   const bg = style?.background ?? ''
   const fg = style?.color ?? ''
@@ -383,6 +390,7 @@ function TagStyleEditor({ tag, style, onClose }: {
           <select
             value={shape}
             onChange={(e) => update({ shape: e.target.value || undefined })}
+            disabled={readOnly}
             style={{ flex: 1, height: 26, padding: '0 6px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)', background: 'var(--color-surface-2)', color: 'var(--color-text-primary)', fontSize: 'var(--text-xs)', outline: 'none' }}
           >
             <option value="">Default</option>
@@ -393,6 +401,7 @@ function TagStyleEditor({ tag, style, onClose }: {
           <select
             value={border}
             onChange={(e) => update({ border: e.target.value || undefined })}
+            disabled={readOnly}
             style={{ flex: 1, height: 26, padding: '0 6px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)', background: 'var(--color-surface-2)', color: 'var(--color-text-primary)', fontSize: 'var(--text-xs)', outline: 'none' }}
           >
             <option value="">Default</option>
@@ -406,6 +415,7 @@ function TagStyleEditor({ tag, style, onClose }: {
             type="range" min={0} max={100} step={5}
             value={opacity ?? 100}
             onChange={(e) => { const val = Number(e.target.value); update({ opacity: val < 100 ? val : undefined }) }}
+            disabled={readOnly}
             style={{ flex: 1, accentColor: 'var(--color-accent)' }}
           />
           <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', width: 30, textAlign: 'right' }}>
@@ -418,11 +428,12 @@ function TagStyleEditor({ tag, style, onClose }: {
             value={fontSize ?? ''}
             placeholder="Default"
             onChange={(e) => update({ fontSize: e.target.value ? Number(e.target.value) : undefined })}
+            disabled={readOnly}
             style={{ width: 60, height: 26, padding: '0 6px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)', background: 'var(--color-surface-2)', color: 'var(--color-text-primary)', fontSize: 'var(--text-xs)', outline: 'none' }}
           />
         </StyleField>
       </div>
-      {style && (
+      {style && !readOnly && (
         <button
           onClick={() => { removeElementStyle(tag); onClose() }}
           className="hover-danger-text"

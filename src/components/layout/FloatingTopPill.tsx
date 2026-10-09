@@ -56,6 +56,7 @@ export default function FloatingTopPill() {
   const canUndo = useWorkspaceStore((s) => s.undoStack.length > 0)
   const canRedo = useWorkspaceStore((s) => s.redoStack.length > 0)
 
+  const readOnly = useWorkspaceStore((s) => s.readOnly)
   const commandPaletteOpen = useWorkspaceStore((s) => s.commandPaletteOpen)
   const iconListDialogOpen = useWorkspaceStore((s) => s.iconListDialogOpen)
   const setIconListDialogOpen = useWorkspaceStore((s) => s.setIconListDialogOpen)
@@ -263,62 +264,111 @@ export default function FloatingTopPill() {
           overflow: 'hidden',
         }}
       >
-        {/* Logo — click to go home */}
-        <button
-          onClick={() => { useWorkspaceStore.getState().closeWorkspace(); navigate('/', { replace: true }) }}
-          title="Close workspace"
-          aria-label="Close workspace"
-          className="hover-subtle"
-          style={{
-            padding: '0 12px',
-            height: '100%',
-            display: 'flex',
-            alignItems: 'center',
-            borderRight: '1px solid var(--color-border)',
-            cursor: 'pointer',
-            border: 'none',
-            transition: 'background 0.12s',
-            flexShrink: 0,
-          }}
-        >
-          <img src="/c4-logo.png" alt="c4hero" style={{ width: 24, height: 24 }} />
-        </button>
-
-        {/* Workspace name — click to open switcher */}
-        {!isMobile && (
-          <button
-            onClick={() => wsPickerOpen ? setWsPickerOpen(false) : openWsPicker()}
-            className="hover-subtle"
-            data-active={wsPickerOpen ? 'true' : undefined}
+        {/* Logo — click to go home (non-interactive in locked/read-only mode: there is
+            nowhere to "go home" to, and leaving `workspace` set keeps the locked
+            viewer's auto-redirect-to-canvas effective) */}
+        {readOnly ? (
+          <div
             style={{
-              padding: '0 10px',
+              padding: '0 12px',
               height: '100%',
               display: 'flex',
               alignItems: 'center',
-              gap: 6,
               borderRight: '1px solid var(--color-border)',
-              minWidth: 0,
-              overflow: 'hidden',
-              flexShrink: 1,
-              border: 'none',
-              cursor: 'pointer',
+              flexShrink: 0,
             }}
           >
-            <span
+            <img src="/c4-logo.png" alt="c4hero" style={{ width: 24, height: 24 }} />
+          </div>
+        ) : (
+          <button
+            onClick={() => { useWorkspaceStore.getState().closeWorkspace(); navigate('/', { replace: true }) }}
+            title="Close workspace"
+            aria-label="Close workspace"
+            className="hover-subtle"
+            style={{
+              padding: '0 12px',
+              height: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              borderRight: '1px solid var(--color-border)',
+              cursor: 'pointer',
+              border: 'none',
+              transition: 'background 0.12s',
+              flexShrink: 0,
+            }}
+          >
+            <img src="/c4-logo.png" alt="c4hero" style={{ width: 24, height: 24 }} />
+          </button>
+        )}
+
+        {/* Workspace name — click to open switcher (non-interactive in locked/
+            read-only mode: there is exactly one workspace and nothing to switch
+            to, rename, delete, or create, so the name is shown as plain text) */}
+        {!isMobile && (
+          readOnly ? (
+            <div
               style={{
-                fontSize: 'var(--text-base)',
-                fontWeight: 600,
-                color: 'var(--color-text-primary)',
+                padding: '0 10px',
+                height: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                borderRight: '1px solid var(--color-border)',
+                minWidth: 0,
                 overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-                maxWidth: 120,
+                flexShrink: 1,
               }}
             >
-              {wsName}
-            </span>
-            <ChevronDown size={12} style={{ opacity: 0.5, flexShrink: 0, transform: wsPickerOpen ? 'rotate(180deg)' : 'none', transition: 'transform 150ms' }} />
-          </button>
+              <span
+                style={{
+                  fontSize: 'var(--text-base)',
+                  fontWeight: 600,
+                  color: 'var(--color-text-primary)',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  maxWidth: 120,
+                }}
+              >
+                {wsName}
+              </span>
+            </div>
+          ) : (
+            <button
+              onClick={() => wsPickerOpen ? setWsPickerOpen(false) : openWsPicker()}
+              className="hover-subtle"
+              data-active={wsPickerOpen ? 'true' : undefined}
+              style={{
+                padding: '0 10px',
+                height: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                borderRight: '1px solid var(--color-border)',
+                minWidth: 0,
+                overflow: 'hidden',
+                flexShrink: 1,
+                border: 'none',
+                cursor: 'pointer',
+              }}
+            >
+              <span
+                style={{
+                  fontSize: 'var(--text-base)',
+                  fontWeight: 600,
+                  color: 'var(--color-text-primary)',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  maxWidth: 120,
+                }}
+              >
+                {wsName}
+              </span>
+              <ChevronDown size={12} style={{ opacity: 0.5, flexShrink: 0, transform: wsPickerOpen ? 'rotate(180deg)' : 'none', transition: 'transform 150ms' }} />
+            </button>
+          )
         )}
 
         {/* View switcher */}
@@ -348,8 +398,9 @@ export default function FloatingTopPill() {
           </button>
         ) : (
           <>
-            {/* Undo/Redo (conditional) */}
-            {showUndoRedo && (
+            {/* Undo/Redo (conditional; never shown in read-only mode — undo/redo are
+                guaranteed no-ops at the store level when locked) */}
+            {showUndoRedo && !readOnly && (
               <>
                 <button
                   onClick={undo}
@@ -446,10 +497,18 @@ export default function FloatingTopPill() {
               padding: '4px 0',
             }}
           >
-            <MenuItemRow icon={FolderSymlink} label="Workspaces…" onClick={() => { setHamburgerOpen(false); openWsPicker() }} />
-            <div style={{ borderTop: '1px solid var(--color-border)', margin: '4px 0' }} />
-            <MenuItemRow icon={Sparkles} label="AI assistant…" onClick={() => { setHamburgerOpen(false); useWorkspaceStore.getState().setAiPanelOpen(true) }} />
-            <div style={{ borderTop: '1px solid var(--color-border)', margin: '4px 0' }} />
+            {!readOnly && (
+              <>
+                <MenuItemRow icon={FolderSymlink} label="Workspaces…" onClick={() => { setHamburgerOpen(false); openWsPicker() }} />
+                <div style={{ borderTop: '1px solid var(--color-border)', margin: '4px 0' }} />
+              </>
+            )}
+            {!readOnly && (
+              <>
+                <MenuItemRow icon={Sparkles} label="AI assistant…" onClick={() => { setHamburgerOpen(false); useWorkspaceStore.getState().setAiPanelOpen(true) }} />
+                <div style={{ borderTop: '1px solid var(--color-border)', margin: '4px 0' }} />
+              </>
+            )}
             <MenuItemRow icon={Download} label="Export…" onClick={() => { setHamburgerOpen(false); setExportDialogOpen(true); setWsPickerOpen(false); useWorkspaceStore.getState().setCommandPaletteOpen(false) }} />
             <div style={{ borderTop: '1px solid var(--color-border)', margin: '4px 0' }} />
             <MenuItemRow
@@ -457,7 +516,7 @@ export default function FloatingTopPill() {
               label="Command palette"
               onClick={() => { setHamburgerOpen(false); useWorkspaceStore.getState().setCommandPaletteOpen(true); setExportDialogOpen(false) }}
             />
-            {showUndoRedo && (
+            {showUndoRedo && !readOnly && (
               <>
                 <div style={{ borderTop: '1px solid var(--color-border)', margin: '4px 0' }} />
                 <MenuItemRow
@@ -481,6 +540,7 @@ export default function FloatingTopPill() {
         <ViewSwitcherPanel
           onClose={() => { setViewDropdownOpen(false) }}
           onShowCreateView={() => setShowCreateView(true)}
+          readOnly={readOnly}
         />
       )}
       {wsPickerOpen && (

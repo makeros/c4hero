@@ -127,7 +127,12 @@ export const createNavigationSlice: StateCreator<
       get().drillInto(elementId)
       return
     }
-    // No child view yet — figure out what type we *would* create.
+    // No child view yet — this is the content-creating branch (it would lead
+    // to confirmZoomCreate/openCreateViewFromZoom adding a view), so it's a
+    // no-op in readOnly mode. Existing-child-view navigation above is allowed
+    // exploration and stays unguarded.
+    if (s.readOnly) return
+    // Figure out what type we *would* create.
     const target = getZoomTarget(s.workspace, elementId)
     if (!target) return // not drillable (person/component/external/etc.)
     set({
@@ -136,6 +141,7 @@ export const createNavigationSlice: StateCreator<
   },
 
   confirmZoomCreate: () => {
+    if (get().readOnly) return
     const s = get()
     const pending = s.pendingZoomConfirm
     if (!pending || !s.workspace) return
@@ -158,6 +164,7 @@ export const createNavigationSlice: StateCreator<
   cancelZoomConfirm: () => set({ pendingZoomConfirm: null }),
 
   openCreateViewFromZoom: () => {
+    if (get().readOnly) return
     const pending = get().pendingZoomConfirm
     if (!pending) return
     set({

@@ -18,6 +18,7 @@ export default function DeploymentElementProperties({ sel, onClose }: {
   sel: SelectedDeploymentElement
   onClose: () => void
 }) {
+  const readOnly = useWorkspaceStore((s) => s.readOnly)
   const updateDeploymentElement = useWorkspaceStore((s) => s.updateDeploymentElement)
   const deleteElements = useWorkspaceStore((s) => s.deleteElements)
   const selectElements = useWorkspaceStore((s) => s.selectElements)
@@ -36,17 +37,19 @@ export default function DeploymentElementProperties({ sel, onClose }: {
           </div>
         </div>
         <div className="flex items-center gap-1">
-          <button
-            onClick={() => { deleteElements([id]); onClose() }}
-            className="btn-icon !min-h-7 !min-w-7 !p-1"
-            aria-label={`Delete ${KIND_LABELS[sel.kind]}`}
-            title={sel.kind === 'deploymentNode'
-              ? 'Delete this node and everything inside it'
-              : `Delete this ${KIND_LABELS[sel.kind].toLowerCase()}`}
-            style={{ color: 'var(--color-danger, #e5484d)' }}
-          >
-            <Trash2 size={14} />
-          </button>
+          {!readOnly && (
+            <button
+              onClick={() => { deleteElements([id]); onClose() }}
+              className="btn-icon !min-h-7 !min-w-7 !p-1"
+              aria-label={`Delete ${KIND_LABELS[sel.kind]}`}
+              title={sel.kind === 'deploymentNode'
+                ? 'Delete this node and everything inside it'
+                : `Delete this ${KIND_LABELS[sel.kind].toLowerCase()}`}
+              style={{ color: 'var(--color-danger, #e5484d)' }}
+            >
+              <Trash2 size={14} />
+            </button>
+          )}
           <button onClick={onClose} className="btn-icon !min-h-7 !min-w-7 !p-1" aria-label="Close panel"><X size={14} /></button>
         </div>
       </div>

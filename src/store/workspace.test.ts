@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { useWorkspaceStore, getBreadcrumb, getCreatableTypes, buildElementMap, buildRelationshipMap, canDrillInto, getRelationshipById, getSelectedElement } from './workspace'
 import { MAX_UNDO } from './workspace-types'
 import type { Workspace } from '@/types/model'
@@ -1051,6 +1051,50 @@ describe('activeWorkspaceFilename', () => {
     })
     useWorkspaceStore.getState().closeWorkspace()
     expect(useWorkspaceStore.getState().pendingDelete).toBeNull()
+  })
+})
+
+// ─── readOnly guard ─────────────────────────────────────────────────
+
+describe('readOnly guard', () => {
+  beforeEach(() => {
+    useWorkspaceStore.getState().setReadOnly(false)
+    useWorkspaceStore.getState().loadWorkspace(makeWorkspace())
+  })
+
+  afterEach(() => {
+    // readOnly is global store state — never leave it true for later tests.
+    useWorkspaceStore.getState().setReadOnly(false)
+  })
+
+  it('defaults to false', () => {
+    useWorkspaceStore.getState().closeWorkspace()
+    expect(useWorkspaceStore.getState().readOnly).toBe(false)
+  })
+
+  it('setReadOnly(true) then updateWorkspaceMeta is a no-op', () => {
+    useWorkspaceStore.getState().setReadOnly(true)
+    const before = useWorkspaceStore.getState().workspace
+    useWorkspaceStore.getState().updateWorkspaceMeta({ name: 'Renamed' })
+    expect(useWorkspaceStore.getState().workspace).toBe(before)
+    expect(useWorkspaceStore.getState().workspace?.name).toBe('Test')
+  })
+
+  it('setReadOnly(true) then closeWorkspace is a no-op', () => {
+    useWorkspaceStore.getState().setReadOnly(true)
+    const before = useWorkspaceStore.getState().workspace
+    useWorkspaceStore.getState().closeWorkspace()
+    expect(useWorkspaceStore.getState().workspace).toBe(before)
+    expect(useWorkspaceStore.getState().workspace).not.toBeNull()
+  })
+
+  it('loadWorkspace still works while readOnly is true', () => {
+    useWorkspaceStore.getState().setReadOnly(true)
+    const ws = makeWorkspace()
+    ws.name = 'Another'
+    useWorkspaceStore.getState().loadWorkspace(ws)
+    expect(useWorkspaceStore.getState().workspace?.name).toBe('Another')
+    expect(useWorkspaceStore.getState().readOnly).toBe(true)
   })
 })
 

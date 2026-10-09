@@ -23,6 +23,7 @@ export default function FloatingViewsPanel() {
   const setActiveView = useWorkspaceStore((s) => s.setActiveView)
   const showCreateView = useWorkspaceStore((s) => s.createViewDialogOpen)
   const setShowCreateView = useWorkspaceStore((s) => s.setCreateViewDialogOpen)
+  const readOnly = useWorkspaceStore((s) => s.readOnly)
 
   if (!workspace || !viewsPanelOpen) return null
 
@@ -74,14 +75,16 @@ export default function FloatingViewsPanel() {
             Views
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <button
-              onClick={() => setShowCreateView(true)}
-              className="btn-icon"
-              style={{ minWidth: 24, minHeight: 24, padding: 3 }}
-              title="New view"
-            >
-              <Plus size={12} />
-            </button>
+            {!readOnly && (
+              <button
+                onClick={() => setShowCreateView(true)}
+                className="btn-icon"
+                style={{ minWidth: 24, minHeight: 24, padding: 3 }}
+                title="New view"
+              >
+                <Plus size={12} />
+              </button>
+            )}
             <button
               onClick={() => setViewsPanelOpen(false)}
               className="btn-icon"
@@ -105,7 +108,7 @@ export default function FloatingViewsPanel() {
         </div>
       </div>
 
-      {showCreateView && (
+      {showCreateView && !readOnly && (
         <Suspense fallback={<LoadingDot />}>
           <CreateViewDialog onClose={() => setShowCreateView(false)} />
         </Suspense>

@@ -5,6 +5,7 @@ import { useRouteSync, useRefreshRedirect } from './useRouteSync'
 import { getCurrentDirHandle, restoreDirHandleByName, readDSLFile } from '@/lib/folderIO'
 import { loadFromLocalStorage } from '@/lib/fileIO'
 import { parseWorkspaceDocument } from '@/lib/workspaceDocument'
+import { getLockedWorkspace } from '@/lib/lockedWorkspace'
 import type { Workspace } from '@/types/model'
 
 // Controllable router doubles — this file-level mock overrides the static one
@@ -36,6 +37,10 @@ vi.mock('@/lib/fileIO', async (importOriginal) => ({
 vi.mock('@/lib/workspaceDocument', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/workspaceDocument')>()),
   parseWorkspaceDocument: vi.fn(),
+}))
+
+vi.mock('@/lib/lockedWorkspace', () => ({
+  getLockedWorkspace: vi.fn(),
 }))
 
 function makeWs(): Workspace {
@@ -87,6 +92,7 @@ beforeEach(() => {
   vi.mocked(readDSLFile).mockReset().mockResolvedValue(null)
   vi.mocked(loadFromLocalStorage).mockReset().mockReturnValue(null)
   vi.mocked(parseWorkspaceDocument).mockReset().mockReturnValue({ workspace: makeWs(), errors: [] })
+  vi.mocked(getLockedWorkspace).mockReset().mockReturnValue(null)
 })
 
 describe('useRouteSync — state → URL', () => {
@@ -293,5 +299,20 @@ describe('useRefreshRedirect', () => {
     renderHook(() => useRefreshRedirect())
 
     await waitFor(() => expect(router.navigate).toHaveBeenCalledWith('/', { replace: true }))
+  })
+
+  it('does nothing when a locked workspace is active, even via the localStorage fallback path', async () => {
+    vi.mocked(getLockedWorkspace).mockReturnValue(makeWs())
+    vi.mocked(loadFromLocalStorage).mockReturnValue(makeWs())
+    router.location.pathname = '/collection/team/my-ws/cont'
+
+    renderHook(() => useRefreshRedirect())
+    await act(async () => {})
+
+    expect(restoreDirHandleByName).not.toHaveBeenCalled()
+    expect(readDSLFile).not.toHaveBeenCalled()
+    expect(loadFromLocalStorage).not.toHaveBeenCalled()
+    expect(useWorkspaceStore.getState().workspace).toBeNull()
+    expect(router.navigate).not.toHaveBeenCalled()
   })
 })

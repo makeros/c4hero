@@ -33,6 +33,7 @@ function makeWs(): Workspace {
 
 beforeEach(() => {
   localStorage.clear()
+  useWorkspaceStore.getState().setReadOnly(false)
   useWorkspaceStore.getState().closeWorkspace()
   useWorkspaceStore.setState({ viewsPanelOpen: false, createViewDialogOpen: false })
 })
@@ -120,5 +121,24 @@ describe('FloatingViewsPanel', () => {
     fireEvent.click(screen.getByTitle('New view'))
     expect(useWorkspaceStore.getState().createViewDialogOpen).toBe(true)
     expect(await screen.findByTestId('create-view-dialog')).toBeTruthy()
+  })
+
+  it('hides the "New view" button and the dialog when read-only', () => {
+    useWorkspaceStore.getState().loadWorkspace(makeWs())
+    useWorkspaceStore.setState({ viewsPanelOpen: true, readOnly: true, createViewDialogOpen: true })
+    render(<FloatingViewsPanel />)
+
+    expect(screen.queryByTitle('New view')).toBeNull()
+    expect(screen.queryByTestId('create-view-dialog')).toBeNull()
+  })
+
+  it('keeps view-list and switch behavior working when read-only', () => {
+    useWorkspaceStore.getState().loadWorkspace(makeWs())
+    useWorkspaceStore.setState({ viewsPanelOpen: true, readOnly: true })
+    render(<FloatingViewsPanel />)
+
+    expect(useWorkspaceStore.getState().activeViewKey).toBe('land')
+    fireEvent.click(screen.getByText('API Context'))
+    expect(useWorkspaceStore.getState().activeViewKey).toBe('ctx')
   })
 })

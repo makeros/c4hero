@@ -31,8 +31,9 @@ export const createRelationshipSlice: StateCreator<
   [['zustand/immer', never]],
   [],
   RelationshipSlice
-> = (set) => ({
+> = (set, get) => ({
   addRelationship: (sourceId, destinationId, description, technology) => {
+    if (get().readOnly) return ''
     const id = nanoid(8)
     let created = false
     set((s) => {
@@ -94,6 +95,7 @@ export const createRelationshipSlice: StateCreator<
   },
 
   updateRelationship: (id, patch) => set((s) => {
+    if (s.readOnly) return
     if (!s.workspace) return
     const rel = s.workspace.model.relationships.find(r => r.id === id)
     if (!rel) return
@@ -119,6 +121,7 @@ export const createRelationshipSlice: StateCreator<
   }),
 
   reconnectRelationship: (id, newSourceId, newTargetId) => set((s) => {
+    if (s.readOnly) return
     if (!s.workspace) return
     const ws = s.workspace
     const rel = ws.model.relationships.find(r => r.id === id)
@@ -167,6 +170,7 @@ export const createRelationshipSlice: StateCreator<
   }),
 
   deleteRelationship: (id) => set((s) => {
+    if (s.readOnly) return
     if (!s.workspace) return
     const ws = s.workspace
     if (!ws.model.relationships.some(r => r.id === id)) return

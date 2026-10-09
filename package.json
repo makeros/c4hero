@@ -28,6 +28,7 @@
   },
   "scripts": {
     "dev": "node scripts/dev.mjs",
+    "build:viewer": "node scripts/build-viewer.mjs",
     "build": "tsc -b && vite build",
     "typecheck": "tsc -b",
     "lint": "eslint .",
