@@ -48,6 +48,41 @@ export default function WelcomeScreen({ initialView }: { initialView?: 'startup'
   // the effect whenever those change so navigating between startup and
   // collection updates the tab title.
 
+  // Auto-open the folder passed via `npm run dev -- --workspace <path>`.
+  // Restores it silently if it was opened before (handle cached in IDB);
+  // otherwise triggers the native picker — which can't jump to an arbitrary
+  // path — and shows a banner telling the user which folder to select.
+  const devWorkspaceName = (import.meta.env.VITE_DEV_WORKSPACE_NAME as string | undefined)?.trim() || undefined
+  const devWorkspacePath = import.meta.env.VITE_DEV_WORKSPACE_PATH as string | undefined
+  const devWorkspaceAttempted = useRef(false)
+  useEffect(() => {
+    if (!devWorkspaceName || !hasFolderAccess() || devWorkspaceAttempted.current || urlSlug) return
+    if (getCurrentDirHandle()?.name === devWorkspaceName) return
+    devWorkspaceAttempted.current = true
+    ;(async () => {
+      const handle = await restoreDirHandleByName(devWorkspaceName)
+      if (handle) {
+        const settings = await readCollectionSettings()
+        addRecentFolder({ name: handle.name, path: handle.name, displayName: settings?.name })
+        setRecentFolders(getRecentFolders())
+        setFolderWorkspaces(await listCurrentDSLFiles())
+        setView('collection', handle.name)
+        return
+      }
+      setDevWorkspaceNotice(`Dev workspace requested via --workspace — select "${devWorkspacePath ?? devWorkspaceName}" in the folder picker.`)
+      await openFolderAndTransition()
+      const openedName = getCurrentDirHandle()?.name
+      if (!openedName) {
+        setDevWorkspaceNotice(`Folder picker cancelled — reload and select "${devWorkspacePath ?? devWorkspaceName}" to load the dev workspace.`)
+      } else if (openedName !== devWorkspaceName) {
+        setDevWorkspaceNotice(`Opened "${openedName}", but --workspace requested "${devWorkspaceName}". Use "Open folder" to pick the right one if needed.`)
+      } else {
+        setDevWorkspaceNotice(null)
+      }
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   // Auto-open scope picker when navigated here with ?new=1
   useEffect(() => {
     if (location.search.includes('new=1')) {
@@ -107,6 +142,7 @@ export default function WelcomeScreen({ initialView }: { initialView?: 'startup'
   const [loadingWorkspace, setLoadingWorkspace] = useState<string | null>(null)
   const [duplicateConfirm, setDuplicateConfirm] = useState<{ slug: string; displayName: string; parentHandle: FileSystemDirectoryHandle } | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const [devWorkspaceNotice, setDevWorkspaceNotice] = useState<string | null>(null)
 
   const jsonInputRef = useRef<HTMLInputElement>(null)
   const dslInputRef = useRef<HTMLInputElement>(null)
@@ -504,6 +540,12 @@ export default function WelcomeScreen({ initialView }: { initialView?: 'startup'
             >
               Dismiss
             </button>
+          </div>
+        )}
+
+        {devWorkspaceNotice && (
+          <div role="status" className="welcome-notice">
+            <span style={{ flex: 1 }}>{devWorkspaceNotice}</span>
           </div>
         )}
 
