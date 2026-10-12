@@ -1,0 +1,51 @@
+- generic [ref=f2e2]:
+  - link "Skip to main content" [ref=f2e3] [cursor=pointer]:
+    - /url: "#c4hero-canvas"
+  - generic [ref=f2e4]:
+    - main "Architecture diagram canvas" [ref=f2e5]:
+      - application [ref=f2e7]:
+        - generic [ref=f2e9]:
+          - generic:
+            - generic:
+              - img:
+                - group "Edge from u to s" [ref=f2e10] [cursor=pointer]
+            - generic: uses
+            - generic:
+              - group [ref=f2e18] [cursor=pointer]:
+                - 'figure "Software System: Sys - desc </script><script>alert(2)</script>" [ref=f2e19]':
+                  - generic [ref=f2e20]:
+                    - button "Sys - press F2 to rename" [ref=f2e25]: Sys
+                    - button "Zoom into Sys" [ref=f2e28]
+                  - paragraph [ref=f2e32]: desc </script><script>alert(2)</script>
+                  - generic [ref=f2e33]: System
+              - group [ref=f2e39] [cursor=pointer]:
+                - 'figure "Person: User `${x}`" [ref=f2e40]':
+                  - 'button "User `${x}` - press F2 to rename" [ref=f2e47]': "User `${x}`"
+                  - generic [ref=f2e48]: Person
+    - navigation "Workspace navigation":
+      - generic [ref=f2e55]:
+        - img "c4hero" [ref=f2e57]
+        - generic [ref=f2e58]: "Rev`${alert(1)}`\"'</script> X"
+        - button "Switch view" [ref=f2e61] [cursor=pointer]:
+          - generic [ref=f2e62]: ctx
+          - generic [ref=f2e63]: L1
+        - button "No file linked — click to save to a .dsl file" [ref=f2e66] [cursor=pointer]
+        - button "Export" [ref=f2e68]
+        - button "Command palette" [ref=f2e72]
+    - navigation "Tools":
+      - toolbar "Canvas tools" [ref=f2e76]:
+        - button "Multi-select (tap multiple nodes)" [ref=f2e77] [cursor=pointer]
+        - button "Zoom to fit" [ref=f2e85] [cursor=pointer]
+        - button "Canvas settings" [ref=f2e92] [cursor=pointer]
+    - complementary "Element inspector"
+    - complementary "Highlighter" [ref=f2e96]:
+      - toolbar "Highlighter facets" [ref=f2e97]:
+        - button "Highlight by Tag" [ref=f2e98] [cursor=pointer]:
+          - generic [ref=f2e102]: Tag
+        - button "Highlight by Status" [ref=f2e103] [cursor=pointer]:
+          - generic [ref=f2e106]: Status
+        - button "Highlight by Tech" [ref=f2e107] [cursor=pointer]:
+          - generic [ref=f2e111]: Tech
+        - button "Highlight by Team" [ref=f2e112] [cursor=pointer]:
+          - generic [ref=f2e118]: Team
+    - generic: v0.4.0 · 4593a95

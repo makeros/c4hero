@@ -1,0 +1,68 @@
+- generic [ref=f4e2]:
+  - link "Skip to main content" [ref=f4e3] [cursor=pointer]:
+    - /url: "#c4hero-canvas"
+  - generic [ref=f4e4]:
+    - main "Architecture diagram canvas" [ref=f4e5]:
+      - generic [ref=f4e6]:
+        - application [ref=f4e7]:
+          - generic [ref=f4e9]:
+            - generic:
+              - generic:
+                - img:
+                  - group "Edge from u to s" [ref=f4e10] [cursor=pointer]
+              - generic: uses
+              - generic:
+                - group [ref=f4e18] [cursor=pointer]:
+                  - 'figure "Software System: Sys - desc </script><script>alert(2)</script>" [ref=f4e19]':
+                    - generic [ref=f4e20]:
+                      - button "Sys - press F2 to rename" [ref=f4e25]: Sys
+                      - button "Zoom into Sys" [ref=f4e28]
+                    - paragraph [ref=f4e32]: desc </script><script>alert(2)</script>
+                    - generic [ref=f4e33]: System
+                - group [ref=f4e39] [cursor=pointer]:
+                  - 'figure "Person: User `${x}`" [ref=f4e40]':
+                    - 'button "User `${x}` - press F2 to rename" [ref=f4e47]': "User `${x}`"
+                    - generic [ref=f4e48]: Person
+        - dialog "Canvas guide" [ref=f4e55]:
+          - generic [ref=f4e56]:
+            - generic [ref=f4e57]: Canvas guide
+            - button "Dismiss canvas guide" [ref=f4e61] [cursor=pointer]
+          - generic [ref=f4e68]:
+            - heading "Add elements" [level=2] [ref=f4e69]
+            - paragraph [ref=f4e70]:
+              - text: "Use the plus tool to add people, systems, containers, and components. Shortcut:"
+              - generic [ref=f4e71]: A
+          - generic "Step 1 of 4" [ref=f4e72]
+          - generic [ref=f4e77]:
+            - button "Skip" [ref=f4e78] [cursor=pointer]
+            - generic [ref=f4e79]:
+              - button "Previous guide step" [disabled] [ref=f4e80]
+              - button "Next" [ref=f4e83] [cursor=pointer]
+          - paragraph [ref=f4e86]: Reopen it from Canvas Settings or the command palette.
+    - navigation "Workspace navigation":
+      - generic [ref=f4e87]:
+        - img "c4hero" [ref=f4e89]
+        - generic [ref=f4e90]: "Rev`${alert(1)}`\"'</script> X"
+        - button "Switch view" [ref=f4e93] [cursor=pointer]:
+          - generic [ref=f4e94]: ctx
+          - generic [ref=f4e95]: L1
+        - button "No file linked — click to save to a .dsl file" [ref=f4e98] [cursor=pointer]
+        - button "Export" [ref=f4e100]
+        - button "Command palette" [ref=f4e104]
+    - navigation "Tools":
+      - toolbar "Canvas tools" [ref=f4e108]:
+        - button "Multi-select (tap multiple nodes)" [ref=f4e109] [cursor=pointer]
+        - button "Zoom to fit" [ref=f4e117] [cursor=pointer]
+        - button "Canvas settings" [ref=f4e124] [cursor=pointer]
+    - complementary "Element inspector"
+    - complementary "Highlighter" [ref=f4e128]:
+      - toolbar "Highlighter facets" [ref=f4e129]:
+        - button "Highlight by Tag" [ref=f4e130] [cursor=pointer]:
+          - generic [ref=f4e134]: Tag
+        - button "Highlight by Status" [ref=f4e135] [cursor=pointer]:
+          - generic [ref=f4e138]: Status
+        - button "Highlight by Tech" [ref=f4e139] [cursor=pointer]:
+          - generic [ref=f4e143]: Tech
+        - button "Highlight by Team" [ref=f4e144] [cursor=pointer]:
+          - generic [ref=f4e150]: Team
+    - generic: v0.4.0 · 4593a95

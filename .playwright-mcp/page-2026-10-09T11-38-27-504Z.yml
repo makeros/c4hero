@@ -1,0 +1,104 @@
+- generic [ref=f7e2]:
+  - link "Skip to main content" [ref=f7e3] [cursor=pointer]:
+    - /url: "#c4hero-canvas"
+  - generic [ref=f7e4]:
+    - main "Architecture diagram canvas" [ref=f7e5]:
+      - application [ref=f7e7]:
+        - generic [ref=f7e9]:
+          - generic:
+            - generic:
+              - img:
+                - group "Edge from user to system" [ref=f7e10] [cursor=pointer]
+            - generic: Uses
+            - generic:
+              - group [ref=f7e15] [cursor=pointer]:
+                - 'figure "Software System: Sample System" [ref=f7e16]':
+                  - generic [ref=f7e17]:
+                    - button "Sample System - press F2 to rename" [ref=f7e22]: Sample System
+                    - button "Zoom into Sample System" [ref=f7e25]
+                  - generic [ref=f7e29]: System
+              - group [ref=f7e35] [cursor=pointer]:
+                - 'figure "Person: User" [ref=f7e36]':
+                  - button "User - press F2 to rename" [ref=f7e43]: User
+                  - generic [ref=f7e44]: Person
+    - navigation "Workspace navigation":
+      - generic:
+        - generic:
+          - generic [ref=f7e51]:
+            - img "c4hero" [ref=f7e53]
+            - generic [ref=f7e54]: Verify Sample
+            - button "Switch view" [ref=f7e57] [cursor=pointer]:
+              - generic [ref=f7e58]: SystemContext
+              - generic [ref=f7e59]: L1
+            - button "No file linked — click to save to a .dsl file" [ref=f7e62] [cursor=pointer]
+            - button "Export" [ref=f7e64]
+            - button "Command palette" [ref=f7e68]
+          - dialog "Command palette" [ref=f7e117]:
+            - generic [ref=f7e118]:
+              - textbox "Search commands" [active] [ref=f7e122]:
+                - /placeholder: Type a command...
+              - generic [ref=f7e123]:
+                - generic [ref=f7e124]:
+                  - generic [ref=f7e125]: Edit
+                  - button "Select All ⌘A" [ref=f7e126]:
+                    - generic [ref=f7e130]: Select All
+                    - generic [ref=f7e131]: ⌘A
+                  - button "Toggle Multi-Select Mode M" [ref=f7e132]:
+                    - generic [ref=f7e139]: Toggle Multi-Select Mode
+                    - generic [ref=f7e140]: M
+                - generic [ref=f7e141]:
+                  - generic [ref=f7e142]: View
+                  - button "Zoom to Fit 0" [ref=f7e143]:
+                    - generic [ref=f7e149]: Zoom to Fit
+                    - generic [ref=f7e150]: "0"
+                  - button "Zoom In +" [ref=f7e151]:
+                    - generic [ref=f7e155]: Zoom In
+                    - generic [ref=f7e156]: +
+                  - button "Zoom Out −" [ref=f7e157]:
+                    - generic [ref=f7e161]: Zoom Out
+                    - generic [ref=f7e162]: −
+                  - button "Toggle Highlighter H" [ref=f7e163]:
+                    - generic [ref=f7e167]: Toggle Highlighter
+                    - generic [ref=f7e168]: H
+                  - button "Toggle Views Panel" [ref=f7e169]
+                  - button "Toggle Minimap" [ref=f7e176]
+                  - button "Toggle Snap to Grid" [ref=f7e180]
+                  - button "Presentation Mode P" [ref=f7e187]:
+                    - generic [ref=f7e191]: Presentation Mode
+                    - generic [ref=f7e192]: P
+                  - button "Canvas Settings" [ref=f7e193]
+                  - button "Canvas Guide" [ref=f7e198]
+                  - button "List Available Icons" [ref=f7e203]
+                - generic [ref=f7e209]:
+                  - generic [ref=f7e210]: Navigation
+                  - button "Search Elements & Views ⌘F" [ref=f7e211]:
+                    - generic [ref=f7e215]: Search Elements & Views
+                    - generic [ref=f7e216]: ⌘F
+                  - 'button "Go to: Containers" [ref=f7e217]'
+                - generic [ref=f7e224]:
+                  - generic [ref=f7e225]: Export
+                  - button "Export as Structurizr DSL" [ref=f7e226]
+                  - button "Export as PNG" [ref=f7e233]
+                  - button "Export as SVG" [ref=f7e239]
+                  - button "Export for Proposal" [ref=f7e245]
+              - generic [ref=f7e251]:
+                - generic [ref=f7e252]: ↑↓ Navigate
+                - generic [ref=f7e253]: ↵ Execute
+                - generic [ref=f7e254]: Esc Close
+    - navigation "Tools":
+      - toolbar "Canvas tools" [ref=f7e72]:
+        - button "Multi-select (tap multiple nodes)" [ref=f7e73] [cursor=pointer]
+        - button "Zoom to fit" [ref=f7e81] [cursor=pointer]
+        - button "Canvas settings" [ref=f7e88] [cursor=pointer]
+    - complementary "Element inspector"
+    - complementary "Highlighter" [ref=f7e92]:
+      - toolbar "Highlighter facets" [ref=f7e93]:
+        - button "Highlight by Tag" [ref=f7e94] [cursor=pointer]:
+          - generic [ref=f7e98]: Tag
+        - button "Highlight by Status" [ref=f7e99] [cursor=pointer]:
+          - generic [ref=f7e102]: Status
+        - button "Highlight by Tech" [ref=f7e103] [cursor=pointer]:
+          - generic [ref=f7e107]: Tech
+        - button "Highlight by Team" [ref=f7e108] [cursor=pointer]:
+          - generic [ref=f7e114]: Team
+    - generic: v0.4.0 · 4593a95
