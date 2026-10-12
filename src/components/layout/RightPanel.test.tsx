@@ -380,3 +380,78 @@ describe('RightPanel — Remove from view button (touch parity)', () => {
     expect(screen.queryByLabelText(/remove from view/i)).toBeNull()
   })
 })
+
+describe('RightPanel — readOnly', () => {
+  afterEach(() => {
+    useWorkspaceStore.setState({ readOnly: false })
+  })
+
+  it('hides mutating element controls but still shows element details', () => {
+    useWorkspaceStore.getState().loadWorkspace(makeWs())
+    useWorkspaceStore.getState().selectElements(['alice'])
+    useWorkspaceStore.setState({ readOnly: true })
+    render(<RightPanel />)
+
+    // Details still visible
+    expect(screen.getByText('Alice')).toBeTruthy()
+    expect(screen.getByText('Person')).toBeTruthy()
+
+    // Mutating controls gone
+    expect(screen.queryByLabelText(/delete from model/i)).toBeNull()
+    expect(screen.queryByLabelText(/remove from view/i)).toBeNull()
+    expect(screen.queryByLabelText(/lock position/i)).toBeNull()
+    expect(screen.queryByLabelText(/unlock position/i)).toBeNull()
+    screen.getAllByRole('radio').forEach((btn) => {
+      expect((btn as HTMLButtonElement).disabled).toBe(true)
+    })
+    screen.getAllByRole('button', { name: /^Status:/ }).forEach((btn) => {
+      expect((btn as HTMLButtonElement).disabled).toBe(true)
+    })
+
+    // Close button (non-mutating) still present and functional
+    expect(screen.getByLabelText('Close panel')).toBeTruthy()
+  })
+
+  it('hides tag add/remove controls in the Tags tab when readOnly', async () => {
+    const user = userEvent.setup()
+    useWorkspaceStore.getState().loadWorkspace(makeWs())
+    useWorkspaceStore.getState().selectElements(['alice'])
+    useWorkspaceStore.setState({ readOnly: true })
+    render(<RightPanel />)
+
+    await user.click(screen.getByRole('tab', { name: 'Tags' }))
+
+    expect(screen.queryByLabelText('Add tag')).toBeNull()
+    expect(screen.queryByPlaceholderText('Add tag...')).toBeNull()
+  })
+
+  it('hides mutating relationship controls but still shows relationship details', () => {
+    useWorkspaceStore.getState().loadWorkspace(makeWs())
+    useWorkspaceStore.getState().selectRelationship('rel1')
+    useWorkspaceStore.setState({ readOnly: true })
+    render(<RightPanel />)
+
+    expect(screen.getByDisplayValue('uses')).toBeTruthy()
+    expect(screen.queryByLabelText(/delete relationship/i)).toBeNull()
+    screen.getAllByLabelText(/^Interaction style:/).forEach((btn) => {
+      expect((btn as HTMLButtonElement).disabled).toBe(true)
+    })
+    screen.getAllByLabelText(/^Line style:/).forEach((btn) => {
+      expect((btn as HTMLButtonElement).disabled).toBe(true)
+    })
+    expect(screen.queryByLabelText('Add property')).toBeNull()
+  })
+
+  it('hides mutating group controls but still shows group details', () => {
+    useWorkspaceStore.getState().loadWorkspace(makeWs())
+    const groupId = useWorkspaceStore.getState().addGroup('My Team', ['alice'])
+    useWorkspaceStore.getState().selectGroup(groupId)
+    useWorkspaceStore.setState({ readOnly: true })
+    render(<RightPanel />)
+
+    expect(screen.getByDisplayValue('My Team')).toBeTruthy()
+    expect(screen.queryByLabelText('Delete group')).toBeNull()
+    expect(screen.queryByLabelText(/remove .* from group/i)).toBeNull()
+    expect(screen.queryByPlaceholderText('Search elements...')).toBeNull()
+  })
+})

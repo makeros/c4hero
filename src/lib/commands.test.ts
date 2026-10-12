@@ -504,6 +504,52 @@ describe('AI commands', () => {
 
 // ─── Command metadata ────────────────────────────────────────────────
 
+describe('read-only mode', () => {
+  const blockedIds = [
+    'add-person', 'add-system', 'add-container', 'add-component',
+    'group-selected', 'undo', 'redo', 'duplicate-selected', 'delete-selected',
+    'auto-arrange', 'new-view', 'duplicate-view', 'close-workspace', 'save',
+    'ai-compose', 'ai-interview', 'ai-review', 'ai-adr', 'ai-settings',
+  ]
+
+  const safeIds = [
+    'select-all', 'zoom-to-fit', 'zoom-in', 'zoom-out', 'toggle-highlighter',
+    'restore-cleared-highlight-filters', 'toggle-multi-select', 'toggle-views-panel',
+    'toggle-minimap', 'toggle-snap-to-grid', 'presentation-mode', 'canvas-settings',
+    'canvas-guide', 'list-icons', 'open-search', 'navigate-back', 'export-dsl',
+    'export-png', 'export-svg', 'export-proposal',
+  ]
+
+  afterEach(() => {
+    useWorkspaceStore.setState({ readOnly: false })
+  })
+
+  it('omits every blocked command id when readOnly is true', () => {
+    useWorkspaceStore.setState({ readOnly: true })
+    const ids = getCommands(null).map((c) => c.id)
+    for (const id of blockedIds) {
+      expect(ids).not.toContain(id)
+    }
+  })
+
+  it('keeps every non-blocked command available when readOnly is true', () => {
+    const idsNormally = getCommands(null).map((c) => c.id)
+    useWorkspaceStore.setState({ readOnly: true })
+    const idsReadOnly = getCommands(null).map((c) => c.id)
+    for (const id of safeIds) {
+      expect(idsNormally).toContain(id)
+      expect(idsReadOnly).toContain(id)
+    }
+  })
+
+  it('restores blocked commands when readOnly is false', () => {
+    useWorkspaceStore.setState({ readOnly: true })
+    expect(getCommands(null).some((c) => c.id === 'add-person')).toBe(false)
+    useWorkspaceStore.setState({ readOnly: false })
+    expect(getCommands(null).some((c) => c.id === 'add-person')).toBe(true)
+  })
+})
+
 describe('command metadata', () => {
   it('every command has a unique id and a known category', () => {
     const commands = getCommands(null)

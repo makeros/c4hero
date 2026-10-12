@@ -191,6 +191,7 @@ export default function Canvas() {
   const teamFilterMode = useWorkspaceStore((s) => s.teamFilterMode)
   const layoutVersion = useWorkspaceStore((s) => s.layoutVersion)
   const canvasGuideOpen = useWorkspaceStore((s) => s.canvasGuideOpen)
+  const readOnly = useWorkspaceStore((s) => s.readOnly)
   const setCanvasGuideOpen = useWorkspaceStore((s) => s.setCanvasGuideOpen)
 
   const highlightFilters = useMemo<HighlightFilters>(() => ({
@@ -1162,6 +1163,8 @@ export default function Canvas() {
         onPaneClick={onPaneClick}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
+        nodesDraggable={!readOnly}
+        nodesConnectable={!readOnly}
         proOptions={RF_PRO_OPTIONS}
         minZoom={0.1}
         maxZoom={2}

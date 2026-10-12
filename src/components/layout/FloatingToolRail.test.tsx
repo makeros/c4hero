@@ -60,6 +60,7 @@ beforeEach(() => {
     multiSelectMode: false,
     aiPanelOpen: false,
     aiSettingsOpen: false,
+    readOnly: false,
   })
   setAiKey('')
 })
@@ -217,5 +218,35 @@ describe('FloatingToolRail', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Canvas settings' }))
     expect(useWorkspaceStore.getState().canvasSettingsOpen).toBe(true)
     expect(screen.getByTestId('canvas-settings-dialog')).toBeTruthy()
+  })
+
+  describe('readOnly', () => {
+    it('removes add-element, AI assistant, and auto-arrange/lock controls from the DOM', () => {
+      setAiKey('sk-test')
+      useWorkspaceStore.getState().loadWorkspace(makeWs())
+      useWorkspaceStore.setState({ readOnly: true })
+      render(<FloatingToolRail />)
+
+      expect(screen.queryByRole('button', { name: 'Add element' })).toBeNull()
+      expect(screen.queryByRole('button', { name: /AI assistant/ })).toBeNull()
+      expect(screen.queryByRole('button', { name: 'Auto-arrange' })).toBeNull()
+    })
+
+    it('keeps zoom-to-fit, canvas settings, and multi-select toggle present and functional', () => {
+      useWorkspaceStore.getState().loadWorkspace(makeWs())
+      useWorkspaceStore.setState({ readOnly: true })
+      render(<FloatingToolRail />)
+
+      fireEvent.click(screen.getByRole('button', { name: 'Zoom to fit' }))
+      expect(fitContentNodesToViewport).toHaveBeenCalledTimes(1)
+
+      fireEvent.click(screen.getByRole('button', { name: 'Canvas settings' }))
+      expect(useWorkspaceStore.getState().canvasSettingsOpen).toBe(true)
+      expect(screen.getByTestId('canvas-settings-dialog')).toBeTruthy()
+
+      const multiSelectBtn = screen.getByRole('button', { name: 'Multi-select (tap multiple nodes)' })
+      fireEvent.click(multiSelectBtn)
+      expect(useWorkspaceStore.getState().multiSelectMode).toBe(true)
+    })
   })
 })

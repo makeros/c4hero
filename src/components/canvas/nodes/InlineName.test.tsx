@@ -141,6 +141,42 @@ describe('InlineName editing', () => {
   })
 })
 
+describe('InlineName read-only mode', () => {
+  const readOnlyDisplay = () => screen.getByRole('button', { name: 'Payment API' })
+
+  afterEach(() => {
+    useWorkspaceStore.getState().setReadOnly(false)
+  })
+
+  it('does not enter edit mode on double-click when readOnly', () => {
+    useWorkspaceStore.getState().setReadOnly(true)
+    render(<InlineName elementId="sys-1" name="Payment API" />)
+    fireEvent.doubleClick(readOnlyDisplay())
+    expect(screen.queryByRole('textbox')).toBeNull()
+  })
+
+  it('lets the double-click event propagate when readOnly, so drill-in still works', () => {
+    useWorkspaceStore.getState().setReadOnly(true)
+    const onDoubleClick = vi.fn()
+    render(
+      <div onDoubleClick={onDoubleClick}>
+        <InlineName elementId="sys-1" name="Payment API" />
+      </div>,
+    )
+    fireEvent.doubleClick(readOnlyDisplay())
+    expect(onDoubleClick).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not enter edit mode via F2 or Enter when readOnly', () => {
+    useWorkspaceStore.getState().setReadOnly(true)
+    render(<InlineName elementId="sys-1" name="Payment API" />)
+    fireEvent.keyDown(readOnlyDisplay(), { key: 'F2' })
+    expect(screen.queryByRole('textbox')).toBeNull()
+    fireEvent.keyDown(readOnlyDisplay(), { key: 'Enter' })
+    expect(screen.queryByRole('textbox')).toBeNull()
+  })
+})
+
 describe('InlineName external sync', () => {
   it('syncs the draft when the name prop changes while not editing', () => {
     const { rerender } = render(<InlineName elementId="sys-1" name="Payment API" />)

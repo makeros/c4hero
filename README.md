@@ -75,6 +75,14 @@ npm run dev
 
 The Vite dev server runs on `http://localhost:3004` with `strictPort: true`.
 
+To jump straight into a specific folder collection on startup (e.g. docs that live in another repo), pass `--workspace`:
+
+```bash
+npm run dev -- --workspace /path/to/docs/svd
+```
+
+This also opens the app in your browser automatically. If that folder was opened before, it's restored with zero clicks. Otherwise the native folder picker opens and a banner tells you which folder to select — the browser's File System Access API can't jump straight to an arbitrary path on a first run.
+
 ### Available commands
 
 ```bash

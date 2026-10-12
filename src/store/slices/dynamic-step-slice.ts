@@ -35,6 +35,7 @@ export const createDynamicStepSlice: StateCreator<
   DynamicStepSlice
 > = (set) => ({
   addDynamicStep: (viewKey, sourceId, destinationId, description) => set((s) => {
+    if (s.readOnly) return
     if (!s.workspace) return
     const ws = s.workspace
     const view = findViewHelper(ws, viewKey)
@@ -101,6 +102,7 @@ export const createDynamicStepSlice: StateCreator<
   }),
 
   updateDynamicStepDescription: (viewKey, stepIndex, description) => set((s) => {
+    if (s.readOnly) return
     if (!s.workspace) return
     const view = findViewHelper(s.workspace, viewKey)
     if (!view || view.type !== 'dynamic') return
@@ -116,6 +118,7 @@ export const createDynamicStepSlice: StateCreator<
   }),
 
   moveDynamicStep: (viewKey, stepIndex, direction) => set((s) => {
+    if (s.readOnly) return
     if (!s.workspace) return
     const view = findViewHelper(s.workspace, viewKey)
     if (!view || view.type !== 'dynamic') return
@@ -129,6 +132,7 @@ export const createDynamicStepSlice: StateCreator<
   }),
 
   deleteDynamicStep: (viewKey, stepIndex) => set((s) => {
+    if (s.readOnly) return
     if (!s.workspace) return
     const view = findViewHelper(s.workspace, viewKey)
     if (!view || view.type !== 'dynamic') return

@@ -710,3 +710,37 @@ describe('Canvas rubber-band selection', () => {
     })
   })
 })
+
+describe('Canvas read-only mode', () => {
+  afterEach(() => {
+    useWorkspaceStore.setState({ readOnly: false })
+  })
+
+  it('disables node dragging and connecting when readOnly is true, enables them otherwise', async () => {
+    seed('cont')
+    useWorkspaceStore.setState({ readOnly: true })
+    await renderCanvas()
+    await screen.findByText('C1')
+    expect(rfStore!.getState().nodesDraggable).toBe(false)
+    expect(rfStore!.getState().nodesConnectable).toBe(false)
+  })
+
+  it('keeps node dragging and connecting enabled when readOnly is false', async () => {
+    seed('cont')
+    useWorkspaceStore.setState({ readOnly: false })
+    await renderCanvas()
+    await screen.findByText('C1')
+    expect(rfStore!.getState().nodesDraggable).toBe(true)
+    expect(rfStore!.getState().nodesConnectable).toBe(true)
+  })
+
+  it('still allows selecting an element by click when readOnly is true', async () => {
+    seed('cont')
+    useWorkspaceStore.setState({ readOnly: true })
+    await renderCanvas()
+    await screen.findByText('C1')
+    act(() => { rfStore!.getState().addSelectedNodes(['c1']) })
+    await wait(200)
+    expect(useWorkspaceStore.getState().selectedElementIds).toEqual(['c1'])
+  })
+})

@@ -10,8 +10,9 @@ export const createGroupSlice: StateCreator<
   [['zustand/immer', never]],
   [],
   GroupSlice
-> = (set) => ({
+> = (set, get) => ({
   addGroup: (name, elementIds = []) => {
+    if (get().readOnly) return ''
     const id = nanoid(8)
     set((s) => {
       if (!s.workspace) return
@@ -23,6 +24,7 @@ export const createGroupSlice: StateCreator<
   },
 
   updateGroup: (id, patch) => set((s) => {
+    if (s.readOnly) return
     if (!s.workspace) return
     const group = s.workspace.model.groups.find(g => g.id === id)
     if (!group) return
@@ -34,6 +36,7 @@ export const createGroupSlice: StateCreator<
   }),
 
   deleteGroup: (id) => set((s) => {
+    if (s.readOnly) return
     if (!s.workspace) return
     const deleted = s.workspace.model.groups.find(g => g.id === id)
     if (!deleted) return

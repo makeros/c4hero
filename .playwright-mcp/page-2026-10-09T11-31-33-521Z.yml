@@ -1,0 +1,98 @@
+- generic [ref=e2]:
+  - link "Skip to main content" [ref=e3] [cursor=pointer]:
+    - /url: "#c4hero-canvas"
+  - generic [ref=e4]:
+    - main "Architecture diagram canvas" [ref=e5]:
+      - application [ref=e7]:
+        - generic [ref=e9]:
+          - generic:
+            - generic:
+              - img:
+                - group "Edge from user to system" [ref=e10] [cursor=pointer]
+            - generic: Uses
+            - generic:
+              - group [ref=e15] [cursor=pointer]:
+                - 'figure "Software System: Sample System" [ref=e16]':
+                  - generic [ref=e17]:
+                    - button "Sample System - press F2 to rename" [ref=e216]: Sample System
+                    - button "Zoom into Sample System" [ref=e25]
+                  - generic [ref=e29]: System
+              - group [ref=e35] [cursor=pointer]:
+                - 'figure "Person: User" [ref=e36]':
+                  - button "User - press F2 to rename" [ref=e43]: User
+                  - generic [ref=e44]: Person
+    - navigation "Workspace navigation":
+      - generic [ref=e83]:
+        - img "c4hero" [ref=e85]
+        - generic [ref=e86]: Verify Sample
+        - button "Switch view" [ref=e89] [cursor=pointer]:
+          - generic [ref=e90]: SystemContext
+          - generic [ref=e91]: L1
+        - button "No file linked — click to save to a .dsl file" [ref=e94] [cursor=pointer]
+        - button "Export" [ref=e96]
+        - button "Command palette" [ref=e100]
+    - navigation "Tools":
+      - toolbar "Canvas tools" [ref=e104]:
+        - button "Multi-select (tap multiple nodes)" [ref=e105] [cursor=pointer]
+        - button "Zoom to fit" [ref=e113] [cursor=pointer]
+        - button "Canvas settings" [ref=e120] [cursor=pointer]
+    - complementary "Element inspector":
+      - generic "Element properties" [ref=e148]:
+        - generic [ref=e150]:
+          - generic [ref=e151]:
+            - generic [ref=e152]:
+              - generic [ref=e153]: Sample System
+              - generic [ref=e154]: Software System
+            - button "Close panel" [ref=e156]
+          - generic [ref=e160]: Scopes the current view — open the parent view to delete this element.
+          - tablist "Element details" [ref=e161]:
+            - tab "Properties" [selected] [ref=e162]
+            - tab "Relations" [ref=e163]
+            - tab "Tags" [ref=e164]
+          - tabpanel "properties" [ref=e165]:
+            - generic [ref=e166]:
+              - generic [ref=e167]:
+                - generic [ref=e168]: Name
+                - textbox "Element name" [disabled] [ref=e169]: Sample System
+              - generic [ref=e170]:
+                - generic [ref=e171]: Location
+                - radiogroup "Location" [ref=e172]:
+                  - radio "Internal" [checked] [disabled] [ref=e173]
+                  - radio "External" [disabled] [ref=e174]
+                  - radio "Unspecified" [disabled] [ref=e175]
+              - generic [ref=e176]:
+                - generic [ref=e177]: Description
+                - textbox "Description" [disabled] [ref=e179]:
+                  - /placeholder: Describe this element...
+              - generic [ref=e180]:
+                - generic [ref=e181]: Status
+                - generic [ref=e182]:
+                  - 'button "Status: Not set" [disabled] [pressed] [ref=e183]': Not set
+                  - 'button "Status: Live" [disabled] [ref=e185]': Live
+                  - 'button "Status: Planned" [disabled] [ref=e187]': Planned
+                  - 'button "Status: Deprecated" [disabled] [ref=e189]': Deprecated
+                  - 'button "Status: Removed" [disabled] [ref=e191]': Removed
+              - generic [ref=e193]:
+                - generic [ref=e194]: Owner
+                - generic "Owner" [ref=e195]: e.g. Team Alpha
+              - generic [ref=e196]:
+                - generic [ref=e197]: URL
+                - textbox "URL" [disabled] [ref=e200]:
+                  - /placeholder: https://...
+              - button "Appears in views 1" [ref=e202] [cursor=pointer]:
+                - generic [ref=e205]: Appears in views
+                - generic [ref=e206]: "1"
+    - complementary "Highlighter" [ref=e124]:
+      - toolbar "Highlighter facets" [ref=e125]:
+        - button "Highlight by Tag" [ref=e126] [cursor=pointer]:
+          - generic [ref=e130]: Tag
+        - button "Highlight by Status" [ref=e131] [cursor=pointer]:
+          - generic [ref=e134]: Status
+        - button "Highlight by Tech" [ref=e135] [cursor=pointer]:
+          - generic [ref=e139]: Tech
+        - button "Highlight by Team" [ref=e140] [cursor=pointer]:
+          - generic [ref=e146]: Team
+    - generic [ref=e207]:
+      - text: Backspace removes from this view · Shift+Backspace deletes from the model
+      - button "Dismiss hint" [ref=e208] [cursor=pointer]
+    - generic: v0.4.0 · 4593a95

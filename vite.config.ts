@@ -9,6 +9,14 @@ import { readFileSync } from 'fs'
 const commitHash = execSync('git rev-parse --short HEAD').toString().trim()
 const appVersion = JSON.parse(readFileSync(path.resolve(__dirname, 'package.json'), 'utf8')).version
 
+// Virtual module that bakes a single workspace's DSL (and optional sidecar)
+// into a standalone "locked viewer" build. Resolves to `export default null`
+// when LOCKED_WORKSPACE_PATH is unset, which is the case for every normal
+// `npm run dev` / `npm run build` invocation — see scripts/build-viewer.mjs
+// for how the env var gets set.
+const LOCKED_WORKSPACE_VIRTUAL_ID = 'virtual:locked-workspace'
+const LOCKED_WORKSPACE_RESOLVED_ID = '\0' + LOCKED_WORKSPACE_VIRTUAL_ID
+
 export default defineConfig({
   plugins: [
     react(),
@@ -29,6 +37,22 @@ export default defineConfig({
             .replace(" 'unsafe-eval'", '')
             .replace(' ws: wss:', '')
         },
+      },
+    },
+    {
+      name: 'locked-workspace',
+      resolveId(id: string) {
+        if (id === LOCKED_WORKSPACE_VIRTUAL_ID) return LOCKED_WORKSPACE_RESOLVED_ID
+      },
+      load(id: string) {
+        if (id !== LOCKED_WORKSPACE_RESOLVED_ID) return
+        const workspacePath = process.env.LOCKED_WORKSPACE_PATH
+        if (!workspacePath) return 'export default null'
+        const dsl = readFileSync(workspacePath, 'utf8')
+        const sidecarPath = process.env.LOCKED_WORKSPACE_SIDECAR_PATH
+        const sidecar = sidecarPath ? readFileSync(sidecarPath, 'utf8') : null
+        const name = path.basename(workspacePath).replace(/\.dsl$/i, '')
+        return `export default ${JSON.stringify({ dsl, sidecar, name })}`
       },
     },
     VitePWA({

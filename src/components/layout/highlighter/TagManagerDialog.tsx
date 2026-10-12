@@ -20,6 +20,7 @@ const COL_TEMPLATE = 'minmax(190px, 1.4fr) minmax(180px, 1.2fr) minmax(160px, 1.
  *  shape, border, opacity) is editable inline on a single row per tag. */
 export default function TagManagerDialog({ onClose }: { onClose: () => void }) {
   const workspace = useWorkspaceStore((s) => s.workspace)
+  const readOnly = useWorkspaceStore((s) => s.readOnly)
   const renameTag = useWorkspaceStore((s) => s.renameTag)
   const removeTagGlobal = useWorkspaceStore((s) => s.removeTagGlobal)
   const updateElementStyle = useWorkspaceStore((s) => s.updateElementStyle)
@@ -117,35 +118,37 @@ export default function TagManagerDialog({ onClose }: { onClose: () => void }) {
         <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
           {tags.length} {tags.length === 1 ? 'tag' : 'tags'}
         </span>
-        <button
-          type="button"
-          onClick={() => newTagInputRef.current?.focus()}
-          className="hover-lift"
-          style={{
-            marginLeft: 'auto',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 5,
-            padding: '5px 10px',
-            borderRadius: 'var(--radius-sm)',
-            border: '1px solid var(--color-accent)',
-            background: 'transparent',
-            color: 'var(--color-accent)',
-            fontSize: 'var(--text-xs)',
-            fontWeight: 600,
-            cursor: 'pointer',
-          }}
-        >
-          <Plus size={12} />
-          New tag
-        </button>
+        {!readOnly && (
+          <button
+            type="button"
+            onClick={() => newTagInputRef.current?.focus()}
+            className="hover-lift"
+            style={{
+              marginLeft: 'auto',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 5,
+              padding: '5px 10px',
+              borderRadius: 'var(--radius-sm)',
+              border: '1px solid var(--color-accent)',
+              background: 'transparent',
+              color: 'var(--color-accent)',
+              fontSize: 'var(--text-xs)',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            <Plus size={12} />
+            New tag
+          </button>
+        )}
         <button
           type="button"
           onClick={onClose}
           className="btn-icon"
           aria-label="Close tag manager"
           title="Close"
-          style={{ minWidth: 26, minHeight: 26, padding: 4 }}
+          style={{ minWidth: 26, minHeight: 26, padding: 4, ...(readOnly ? { marginLeft: 'auto' } : {}) }}
         >
           <X size={14} />
         </button>
@@ -203,6 +206,7 @@ export default function TagManagerDialog({ onClose }: { onClose: () => void }) {
             tag={tag}
             style={styleByTag.get(tag)}
             builtIn={BUILTIN_TAGS.has(tag)}
+            readOnly={readOnly}
             onUpdate={(patch) => updateElementStyle({ tag, ...patch })}
             onRename={(next) => renameTag(tag, next)}
             onRemove={() => removeTagGlobal(tag)}
@@ -211,57 +215,59 @@ export default function TagManagerDialog({ onClose }: { onClose: () => void }) {
       </div>
 
       {/* Footer: add new tag */}
-      <footer
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 10,
-          padding: '12px 18px',
-          borderTop: '1px solid var(--color-border)',
-        }}
-      >
-        <input
-          ref={newTagInputRef}
-          type="text"
-          value={newTagDraft}
-          onChange={(e) => setNewTagDraft(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddTag() } }}
-          placeholder="New tag name…"
+      {!readOnly && (
+        <footer
           style={{
-            flex: 1,
-            height: 32,
-            padding: '0 12px',
-            borderRadius: 'var(--radius-sm)',
-            border: '1px solid var(--color-border)',
-            background: 'var(--color-surface-2)',
-            color: 'var(--color-text-primary)',
-            fontSize: 'var(--text-xs)',
-            outline: 'none',
-          }}
-        />
-        <button
-          type="button"
-          onClick={handleAddTag}
-          disabled={!newTagDraft.trim()}
-          style={{
-            display: 'inline-flex',
+            display: 'flex',
             alignItems: 'center',
-            gap: 5,
-            padding: '7px 14px',
-            borderRadius: 'var(--radius-sm)',
-            border: '1px solid var(--color-accent)',
-            background: newTagDraft.trim() ? 'var(--color-accent)' : 'transparent',
-            color: newTagDraft.trim() ? 'var(--color-bg-primary)' : 'var(--color-text-muted)',
-            fontSize: 'var(--text-xs)',
-            fontWeight: 700,
-            cursor: newTagDraft.trim() ? 'pointer' : 'not-allowed',
-            opacity: newTagDraft.trim() ? 1 : 0.6,
+            gap: 10,
+            padding: '12px 18px',
+            borderTop: '1px solid var(--color-border)',
           }}
         >
-          <Plus size={12} />
-          Add
-        </button>
-      </footer>
+          <input
+            ref={newTagInputRef}
+            type="text"
+            value={newTagDraft}
+            onChange={(e) => setNewTagDraft(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddTag() } }}
+            placeholder="New tag name…"
+            style={{
+              flex: 1,
+              height: 32,
+              padding: '0 12px',
+              borderRadius: 'var(--radius-sm)',
+              border: '1px solid var(--color-border)',
+              background: 'var(--color-surface-2)',
+              color: 'var(--color-text-primary)',
+              fontSize: 'var(--text-xs)',
+              outline: 'none',
+            }}
+          />
+          <button
+            type="button"
+            onClick={handleAddTag}
+            disabled={!newTagDraft.trim()}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 5,
+              padding: '7px 14px',
+              borderRadius: 'var(--radius-sm)',
+              border: '1px solid var(--color-accent)',
+              background: newTagDraft.trim() ? 'var(--color-accent)' : 'transparent',
+              color: newTagDraft.trim() ? 'var(--color-bg-primary)' : 'var(--color-text-muted)',
+              fontSize: 'var(--text-xs)',
+              fontWeight: 700,
+              cursor: newTagDraft.trim() ? 'pointer' : 'not-allowed',
+              opacity: newTagDraft.trim() ? 1 : 0.6,
+            }}
+          >
+            <Plus size={12} />
+            Add
+          </button>
+        </footer>
+      )}
     </DialogShell>
   )
 }
@@ -269,12 +275,13 @@ export default function TagManagerDialog({ onClose }: { onClose: () => void }) {
 // ─── Row ───────────────────────────────────────────────────────────────
 
 function TagRow({
-  tag, style, builtIn,
+  tag, style, builtIn, readOnly,
   onUpdate, onRename, onRemove,
 }: {
   tag: string
   style: ElementStyle | undefined
   builtIn: boolean
+  readOnly?: boolean
   onUpdate: (patch: Partial<ElementStyle>) => void
   onRename: (next: string) => void
   onRemove: () => void
@@ -336,7 +343,7 @@ function TagRow({
         >
           {tag}
         </span>
-        {builtIn ? (
+        {builtIn || readOnly ? (
           <span
             style={{
               flex: 1,
@@ -346,7 +353,7 @@ function TagRow({
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap',
             }}
-            title="Built-in tag — name not editable"
+            title={builtIn ? 'Built-in tag — name not editable' : undefined}
           >
             {tag}
           </span>
@@ -403,6 +410,7 @@ function TagRow({
           value={style?.shape ?? ''}
           onChange={(e) => onUpdate({ shape: e.target.value || undefined })}
           aria-label={`Shape for ${tag}`}
+          disabled={readOnly}
           style={selectStyle}
         >
           <option value="">default</option>
@@ -416,6 +424,7 @@ function TagRow({
           value={style?.border ?? ''}
           onChange={(e) => onUpdate({ border: e.target.value || undefined })}
           aria-label={`Border for ${tag}`}
+          disabled={readOnly}
           style={selectStyle}
         >
           <option value="">none</option>
@@ -438,6 +447,7 @@ function TagRow({
             onUpdate({ opacity: v < 100 ? v : undefined })
           }}
           aria-label={`Opacity for ${tag}`}
+          disabled={readOnly}
           style={{ flex: 1, accentColor: 'var(--color-accent)' }}
         />
         <span
@@ -455,7 +465,7 @@ function TagRow({
 
       {/* REMOVE */}
       <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-        {!builtIn ? (
+        {!builtIn && !readOnly ? (
           <button
             type="button"
             onClick={onRemove}

@@ -28,9 +28,43 @@ export function EditableField({
   'aria-invalid'?: boolean
   'aria-describedby'?: string
 }) {
+  const readOnly = useWorkspaceStore((s) => s.readOnly)
   const [draft, setDraft] = useState(value)
   const [focused, setFocused] = useState(false)
   const inputValue = focused ? draft : value
+
+  if (readOnly) {
+    if (multiline) {
+      return (
+        <textarea
+          value={value}
+          readOnly
+          disabled
+          placeholder={placeholder}
+          aria-label={ariaLabel}
+          aria-invalid={ariaInvalid}
+          aria-describedby={ariaDescribedBy}
+          rows={3}
+          className="w-full resize-none rounded-lg border px-3 py-2 text-sm outline-none"
+          style={{ background: 'var(--color-surface-2)', borderColor: 'var(--color-border)', color: 'var(--color-text-muted)', cursor: 'default' }}
+        />
+      )
+    }
+    return (
+      <input
+        type="text"
+        value={value}
+        readOnly
+        disabled
+        placeholder={placeholder}
+        aria-label={ariaLabel}
+        aria-invalid={ariaInvalid}
+        aria-describedby={ariaDescribedBy}
+        className="w-full rounded-lg border px-3 py-2 text-sm outline-none"
+        style={{ background: 'var(--color-surface-2)', borderColor: 'var(--color-border)', color: 'var(--color-text-muted)', cursor: 'default' }}
+      />
+    )
+  }
 
   const handleChange = (newVal: string) => {
     setDraft(newVal)
@@ -192,6 +226,7 @@ export function TechnologyField({ value, placeholder, onCommit, onLiveChange, sc
   scope: TechnologyScope
   'aria-label'?: string
 }) {
+  const readOnly = useWorkspaceStore((s) => s.readOnly)
   const [draft, setDraft] = useState('')
   const [focused, setFocused] = useState(false)
   const [selectedIdx, setSelectedIdx] = useState(-1)
@@ -201,6 +236,45 @@ export function TechnologyField({ value, placeholder, onCommit, onLiveChange, sc
 
   const tokens = splitTokens(value)
   const alreadyUsed = new Set(tokens.map((t) => t.toLowerCase()))
+
+  if (readOnly) {
+    return (
+      <div
+        aria-label={ariaLabel}
+        className="w-full rounded-lg border px-2 py-1.5 text-sm"
+        style={{
+          background: 'var(--color-surface-2)',
+          borderColor: 'var(--color-border)',
+          color: tokens.length ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
+          minHeight: 36,
+          display: 'flex',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: 4,
+        }}
+      >
+        {tokens.length ? (
+          tokens.map((t) => (
+            <span
+              key={t}
+              className="c4-type-chip"
+              style={{
+                background: 'color-mix(in srgb, var(--color-text-muted) 14%, transparent)',
+                color: 'var(--color-text-primary)',
+                fontWeight: 600,
+                textTransform: 'none',
+                letterSpacing: 'normal',
+              }}
+            >
+              {t}
+            </span>
+          ))
+        ) : (
+          <span>{placeholder}</span>
+        )}
+      </div>
+    )
+  }
 
   const filtered = draft.trim()
     ? suggestions.filter(
@@ -437,6 +511,7 @@ export function OwnerField({ value, placeholder, onCommit, onLiveChange, 'aria-l
   onLiveChange?: (val: string) => void
   'aria-label'?: string
 }) {
+  const readOnly = useWorkspaceStore((s) => s.readOnly)
   const [draft, setDraft] = useState(value)
   const [focused, setFocused] = useState(false)
   const [selectedIdx, setSelectedIdx] = useState(-1)
@@ -453,6 +528,25 @@ export function OwnerField({ value, placeholder, onCommit, onLiveChange, 'aria-l
     if (!q) return suggestions
     return suggestions.filter((s) => s.owner.toLowerCase().includes(q))
   }, [suggestions, draft])
+
+  if (readOnly) {
+    return (
+      <div
+        aria-label={ariaLabel}
+        className="w-full rounded-lg border px-2 py-1.5 text-sm"
+        style={{
+          background: 'var(--color-surface-2)',
+          borderColor: 'var(--color-border)',
+          color: value ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
+          minHeight: 36,
+          display: 'flex',
+          alignItems: 'center',
+        }}
+      >
+        {value || placeholder}
+      </div>
+    )
+  }
 
   const showDropdown = focused && filtered.length > 0
 

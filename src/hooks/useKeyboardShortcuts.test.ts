@@ -2,9 +2,15 @@
 import { renderHook } from '@testing-library/react'
 import { useWorkspaceStore } from '@/store/workspace'
 import { useKeyboardShortcuts, shouldSuppressBackspaceNavigation } from './useKeyboardShortcuts'
+import { openDSLFile, saveDSLFile } from '@/lib/fileIO'
 import type { Workspace } from '@/types/model'
 
 vi.mock('@xyflow/react', () => ({ useReactFlow: () => { throw new Error('not in flow') } }))
+vi.mock('@/lib/fileIO', () => ({
+  saveDSLFile: vi.fn().mockResolvedValue(true),
+  openDSLFile: vi.fn().mockResolvedValue(null),
+  writeSidecarToHandle: vi.fn().mockResolvedValue(undefined),
+}))
 
 function makeWs(): Workspace {
   return {
@@ -37,8 +43,8 @@ function makeWs(): Workspace {
   }
 }
 
-function press(key: string, opts: { shift?: boolean } = {}) {
-  const ev = new KeyboardEvent('keydown', { key, shiftKey: !!opts.shift, bubbles: true })
+function press(key: string, opts: { shift?: boolean; mod?: boolean } = {}) {
+  const ev = new KeyboardEvent('keydown', { key, shiftKey: !!opts.shift, metaKey: !!opts.mod, bubbles: true })
   window.dispatchEvent(ev)
 }
 
@@ -317,5 +323,136 @@ describe('useKeyboardShortcuts — global shortcut coverage', () => {
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', bubbles: true }))
     expect(useWorkspaceStore.getState().addElementPanelOpen).toBe(false)
     input.remove()
+  })
+})
+
+describe('useKeyboardShortcuts — readOnly guards mutating shortcuts', () => {
+  function setup(beforeReadOnly?: () => void) {
+    window.history.pushState({}, '', '/collection/team/diagram')
+    const s = useWorkspaceStore.getState()
+    s.loadWorkspace(makeWs())
+    s.setActiveView('cont')
+    s.selectElements(['c2'])
+    s.setAddElementPanelOpen(false)
+    beforeReadOnly?.()
+    s.setReadOnly(true)
+    renderHook(() => useKeyboardShortcuts())
+  }
+
+  afterEach(() => {
+    // readOnly is global store state — never leave it true for later tests.
+    useWorkspaceStore.getState().setReadOnly(false)
+  })
+
+  it('mod+o does not open a file picker or swap the workspace', () => {
+    setup()
+    const before = useWorkspaceStore.getState().workspace
+    press('o', { mod: true })
+    expect(openDSLFile).not.toHaveBeenCalled()
+    expect(useWorkspaceStore.getState().workspace).toBe(before)
+  })
+
+  it('mod+s does not save the file', () => {
+    setup()
+    press('s', { mod: true })
+    expect(saveDSLFile).not.toHaveBeenCalled()
+  })
+
+  it('mod+z (undo) is a no-op', () => {
+    setup()
+    const before = useWorkspaceStore.getState().workspace
+    press('z', { mod: true })
+    expect(useWorkspaceStore.getState().workspace).toBe(before)
+  })
+
+  it('mod+shift+z (redo) is a no-op', () => {
+    setup()
+    const before = useWorkspaceStore.getState().workspace
+    press('z', { mod: true, shift: true })
+    expect(useWorkspaceStore.getState().workspace).toBe(before)
+  })
+
+  it('mod+d (duplicate) does not add elements', () => {
+    setup()
+    const before = useWorkspaceStore.getState().workspace!.model.softwareSystems[0].containers.length
+    press('d', { mod: true })
+    expect(useWorkspaceStore.getState().workspace!.model.softwareSystems[0].containers.length).toBe(before)
+  })
+
+  it('Backspace does not remove the element from the view', () => {
+    setup()
+    press('Backspace')
+    expect(useWorkspaceStore.getState().workspace!.views.containerViews[0].elements.map(e => e.id)).toEqual(['c1', 'c2'])
+  })
+
+  it('Delete does not remove the element from the view', () => {
+    setup()
+    press('Delete')
+    expect(useWorkspaceStore.getState().workspace!.views.containerViews[0].elements.map(e => e.id)).toEqual(['c1', 'c2'])
+  })
+
+  it('shift+Backspace does not open the delete-confirm dialog', () => {
+    setup()
+    press('Backspace', { shift: true })
+    expect(useWorkspaceStore.getState().pendingDelete).toBeNull()
+  })
+
+  it('shift+Delete does not open the delete-confirm dialog', () => {
+    setup()
+    press('Delete', { shift: true })
+    expect(useWorkspaceStore.getState().pendingDelete).toBeNull()
+  })
+
+  it('shift+G does not add a group', () => {
+    setup()
+    expect(useWorkspaceStore.getState().workspace!.model.groups.length).toBe(0)
+    press('G', { shift: true })
+    expect(useWorkspaceStore.getState().workspace!.model.groups.length).toBe(0)
+  })
+
+  it('shift+P does not add a person', () => {
+    setup()
+    useWorkspaceStore.getState().setActiveView('land')
+    const before = useWorkspaceStore.getState().workspace!.model.people.length
+    press('P', { shift: true })
+    expect(useWorkspaceStore.getState().workspace!.model.people.length).toBe(before)
+  })
+
+  it('shift+S does not add a software system', () => {
+    setup()
+    useWorkspaceStore.getState().setActiveView('land')
+    const before = useWorkspaceStore.getState().workspace!.model.softwareSystems.length
+    press('S', { shift: true })
+    expect(useWorkspaceStore.getState().workspace!.model.softwareSystems.length).toBe(before)
+  })
+
+  it('shift+C does not add a container', () => {
+    setup()
+    const before = useWorkspaceStore.getState().workspace!.model.softwareSystems[0].containers.length
+    press('C', { shift: true })
+    expect(useWorkspaceStore.getState().workspace!.model.softwareSystems[0].containers.length).toBe(before)
+  })
+
+  it('shift+O does not add a component', () => {
+    let compKey = ''
+    setup(() => {
+      compKey = useWorkspaceStore.getState().addView('component', 'c1', 'Comp')
+    })
+    useWorkspaceStore.getState().setActiveView(compKey)
+    press('O', { shift: true })
+    expect(useWorkspaceStore.getState().workspace!.model.softwareSystems[0].containers[0].components.length).toBe(0)
+  })
+
+  it('"a" does not open the add-element panel', () => {
+    setup()
+    press('a')
+    expect(useWorkspaceStore.getState().addElementPanelOpen).toBe(false)
+  })
+
+  it('mod+shift+l (reset and relayout) is a no-op', () => {
+    setup()
+    const before = useWorkspaceStore.getState().layoutVersion
+    press('l', { mod: true, shift: true })
+    expect(useWorkspaceStore.getState().layoutVersion).toBe(before)
   })
 })

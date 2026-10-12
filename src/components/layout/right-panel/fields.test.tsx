@@ -38,8 +38,13 @@ function makeWs(): Workspace {
 
 beforeEach(() => {
   localStorage.clear()
+  useWorkspaceStore.getState().setReadOnly(false)
   useWorkspaceStore.getState().closeWorkspace()
   useWorkspaceStore.getState().loadWorkspace(makeWs())
+})
+
+afterEach(() => {
+  useWorkspaceStore.getState().setReadOnly(false)
 })
 
 describe('FieldLabel', () => {
@@ -102,6 +107,35 @@ describe('EditableField', () => {
     expect(onCommit).not.toHaveBeenCalled()
     fireEvent.blur(area)
     expect(onCommit).toHaveBeenCalledWith('line')
+  })
+
+  it('renders disabled and fires no callbacks when the store is read-only', () => {
+    useWorkspaceStore.getState().setReadOnly(true)
+    const onCommit = vi.fn()
+    const onLiveChange = vi.fn()
+    render(<EditableField value="old" aria-label="Name" onCommit={onCommit} onLiveChange={onLiveChange} />)
+
+    const input = screen.getByLabelText('Name') as HTMLInputElement
+    expect(input.disabled).toBe(true)
+    fireEvent.change(input, { target: { value: 'new name' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    fireEvent.blur(input)
+    expect(onCommit).not.toHaveBeenCalled()
+    expect(onLiveChange).not.toHaveBeenCalled()
+    expect(input.value).toBe('old')
+  })
+
+  it('renders a disabled textarea in multiline read-only mode', () => {
+    useWorkspaceStore.getState().setReadOnly(true)
+    const onCommit = vi.fn()
+    render(<EditableField value="desc" aria-label="Description" onCommit={onCommit} multiline />)
+
+    const area = screen.getByLabelText('Description') as HTMLTextAreaElement
+    expect(area.tagName).toBe('TEXTAREA')
+    expect(area.disabled).toBe(true)
+    fireEvent.change(area, { target: { value: 'line' } })
+    fireEvent.blur(area)
+    expect(onCommit).not.toHaveBeenCalled()
   })
 })
 
@@ -207,6 +241,21 @@ describe('TechnologyField', () => {
     fireEvent.change(input, { target: { value: 'zzz-no-match' } })
     fireEvent.keyDown(input, { key: 'Escape' })
     expect((input as HTMLInputElement).value).toBe('')
+  })
+
+  it('renders chips as plain text and no editable input when the store is read-only', () => {
+    useWorkspaceStore.getState().setReadOnly(true)
+    const onCommit = vi.fn()
+    const onLiveChange = vi.fn()
+    render(<TechnologyField value="React, PostgreSQL" scope="element" aria-label="Technology" onCommit={onCommit} onLiveChange={onLiveChange} />)
+
+    const wrapper = screen.getByLabelText('Technology')
+    expect(wrapper.querySelector('input')).toBeNull()
+    expect(screen.getByText('React')).toBeTruthy()
+    expect(screen.getByText('PostgreSQL')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /Remove/ })).toBeNull()
+    expect(onCommit).not.toHaveBeenCalled()
+    expect(onLiveChange).not.toHaveBeenCalled()
   })
 })
 
@@ -316,5 +365,18 @@ describe('OwnerField', () => {
     await user.click(input)
     await user.keyboard('Core Team{Enter}')
     expect(onCommit).toHaveBeenCalledWith('Core Team')
+  })
+
+  it('renders plain text and no editable input when the store is read-only', () => {
+    useWorkspaceStore.getState().setReadOnly(true)
+    const onCommit = vi.fn()
+    const onLiveChange = vi.fn()
+    render(<OwnerField value="Team B" aria-label="Owner" placeholder="e.g. Team Alpha" onCommit={onCommit} onLiveChange={onLiveChange} />)
+
+    const wrapper = screen.getByLabelText('Owner')
+    expect(wrapper.querySelector('input')).toBeNull()
+    expect(wrapper.textContent).toBe('Team B')
+    expect(onCommit).not.toHaveBeenCalled()
+    expect(onLiveChange).not.toHaveBeenCalled()
   })
 })

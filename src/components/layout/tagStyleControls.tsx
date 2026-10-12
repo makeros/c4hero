@@ -1,6 +1,7 @@
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import { useAnchoredPopover } from '@/hooks/useAnchoredPopover'
+import { useWorkspaceStore } from '@/store/workspace'
 
 /** Shared color-picker component used by the tag manager surfaces. Constants
  *  live in `tagStyleConstants.ts` so this file exports only components and
@@ -9,6 +10,7 @@ import { useAnchoredPopover } from '@/hooks/useAnchoredPopover'
 export function ColorPicker({ value, onChange, presets }: {
   value: string; onChange: (value: string) => void; presets: string[]
 }) {
+  const readOnly = useWorkspaceStore((s) => s.readOnly)
   // Popup dimensions: 6 items per row × 22px + gaps + padding
   const POPUP_W = 158
   const POPUP_H = 64
@@ -27,12 +29,14 @@ export function ColorPicker({ value, onChange, presets }: {
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder="#hex or name"
+        disabled={readOnly}
         style={{ flex: 1, height: 26, padding: '0 8px', paddingLeft: 26, borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)', background: 'var(--color-surface-2)', color: 'var(--color-text-primary)', fontSize: 'var(--text-xs)', outline: 'none' }}
       />
       <button
         ref={triggerRef}
         onClick={toggle}
-        style={{ position: 'absolute', left: 5, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14, borderRadius: 3, border: '1px solid var(--color-border)', background: value || 'transparent', cursor: 'pointer', padding: 0 }}
+        disabled={readOnly}
+        style={{ position: 'absolute', left: 5, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14, borderRadius: 3, border: '1px solid var(--color-border)', background: value || 'transparent', cursor: readOnly ? 'default' : 'pointer', padding: 0 }}
       />
       {showPresets && coords && createPortal(
         <div ref={popupRef} style={{

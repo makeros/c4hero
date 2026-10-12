@@ -94,6 +94,7 @@ export const createUiSlice: StateCreator<
   clearAiPanelFeature: () => set({ aiPanelFeature: null }),
   setAiPanelBusy: (busy) => set({ aiPanelBusy: busy }),
   setBatchApplying: (on) => {
+    if (on && get().readOnly) return
     // Compare FINALIZED workspace refs across the batch (captured via get(), not
     // immer drafts — those are revoked between produce calls).
     if (on && !get().batchApplying) {

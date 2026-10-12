@@ -1,0 +1,50 @@
+- generic [ref=e2]:
+  - link "Skip to main content" [ref=e3] [cursor=pointer]:
+    - /url: "#c4hero-canvas"
+  - generic [ref=e4]:
+    - main "Architecture diagram canvas" [ref=e5]:
+      - application [ref=e7]:
+        - generic [ref=e9]:
+          - generic:
+            - generic:
+              - img:
+                - group "Edge from user to system" [ref=e10] [cursor=pointer]
+            - generic: Uses
+            - generic:
+              - group [ref=e15] [cursor=pointer]:
+                - 'figure "Software System: Sample System" [ref=e16]':
+                  - generic [ref=e17]:
+                    - button "Sample System - press F2 to rename" [ref=e22]: Sample System
+                    - button "Zoom into Sample System" [ref=e25]
+                  - generic [ref=e29]: System
+              - group [ref=e35] [cursor=pointer]:
+                - 'figure "Person: User" [ref=e36]':
+                  - button "User - press F2 to rename" [ref=e43]: User
+                  - generic [ref=e44]: Person
+    - navigation "Workspace navigation":
+      - generic [ref=e83]:
+        - img "c4hero" [ref=e85]
+        - generic [ref=e86]: Verify Sample
+        - button "Switch view" [ref=e89] [cursor=pointer]:
+          - generic [ref=e90]: SystemContext
+          - generic [ref=e91]: L1
+        - button "No file linked — click to save to a .dsl file" [ref=e94] [cursor=pointer]
+        - button "Export" [ref=e96]
+        - button "Command palette" [ref=e100]
+    - navigation "Tools":
+      - toolbar "Canvas tools" [ref=e104]:
+        - button "Multi-select (tap multiple nodes)" [ref=e105] [cursor=pointer]
+        - button "Zoom to fit" [ref=e113] [cursor=pointer]
+        - button "Canvas settings" [ref=e120] [cursor=pointer]
+    - complementary "Element inspector"
+    - complementary "Highlighter" [ref=e124]:
+      - toolbar "Highlighter facets" [ref=e125]:
+        - button "Highlight by Tag" [ref=e126] [cursor=pointer]:
+          - generic [ref=e130]: Tag
+        - button "Highlight by Status" [ref=e131] [cursor=pointer]:
+          - generic [ref=e134]: Status
+        - button "Highlight by Tech" [ref=e135] [cursor=pointer]:
+          - generic [ref=e139]: Tech
+        - button "Highlight by Team" [ref=e140] [cursor=pointer]:
+          - generic [ref=e146]: Team
+    - generic: v0.4.0 · 4593a95

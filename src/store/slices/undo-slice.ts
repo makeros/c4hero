@@ -27,6 +27,7 @@ export const createUndoSlice: StateCreator<
   setLastSavedUndoLength: (n) => set({ lastSavedUndoLength: n }),
 
   undo: () => {
+    if (get().readOnly) return
     set((s) => {
       if (s.undoStack.length === 0 || !s.workspace) return
       // Capture the pre-produce (= current) workspace ref for the redo stack.
@@ -51,6 +52,7 @@ export const createUndoSlice: StateCreator<
   },
 
   redo: () => {
+    if (get().readOnly) return
     set((s) => {
       if (s.redoStack.length === 0 || !s.workspace) return
       const currentWs = undoSnapshot(s)!
@@ -75,6 +77,7 @@ export const createUndoSlice: StateCreator<
     // Wholesale workspace replacement with the same view/selection/scope fixups as
     // undo(), but WITHOUT touching the undo/redo stacks — the caller's batch owns
     // the single undo entry. Used by the AI sweep's replay-from-baseline revert.
+    if (s.readOnly) return
     normalizeWorkspaceShape(ws)
     s.workspace = ws
     const activeStillExists = s.activeViewKey ? !!findViewHelper(ws, s.activeViewKey) : false

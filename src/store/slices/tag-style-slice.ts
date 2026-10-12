@@ -16,6 +16,7 @@ export const createTagStyleSlice: StateCreator<
   TagStyleSlice
 > = (set) => ({
   updateElementStyle: (style) => set((s) => {
+    if (s.readOnly) return
     if (!s.workspace) return
     const styles = s.workspace.views.configuration.styles.elements
     const idx = styles.findIndex((es) => es.tag === style.tag)
@@ -34,6 +35,7 @@ export const createTagStyleSlice: StateCreator<
   }),
 
   removeElementStyle: (tag) => set((s) => {
+    if (s.readOnly) return
     // Built-in tag styles CAN be removed — the theme provides the fallback.
     if (!s.workspace) return
     const styles = s.workspace.views.configuration.styles.elements
@@ -43,6 +45,7 @@ export const createTagStyleSlice: StateCreator<
   }),
 
   renameTag: (oldTag, newTag) => set((s) => {
+    if (s.readOnly) return
     if (!newTag.trim() || oldTag === newTag) return
     if (BUILTIN_TAGS.has(oldTag)) return // Built-in tags cannot be renamed
     if (BUILTIN_TAGS.has(newTag.trim())) return // Cannot rename a custom tag to a built-in name
@@ -65,6 +68,7 @@ export const createTagStyleSlice: StateCreator<
   }),
 
   removeTagGlobal: (tag) => set((s) => {
+    if (s.readOnly) return
     if (BUILTIN_TAGS.has(tag)) return // Built-in tags cannot be removed
     if (!s.workspace) return
     const ws = s.workspace

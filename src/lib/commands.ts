@@ -20,6 +20,18 @@ import type { ReactFlowInstance } from '@xyflow/react'
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
 const mod = isMac ? '⌘' : 'Ctrl+'
 
+// Commands that mutate the model, persist to disk, or launch AI editing flows.
+// Blocked by id (not category) when the workspace is read-only — category alone
+// doesn't separate mutating from safe commands (e.g. 'new-view'/'duplicate-view'/
+// 'auto-arrange' are category 'view' but mutate; 'save' is category 'export' but
+// persists to disk).
+const READONLY_BLOCKED_IDS = new Set<string>([
+  'add-person', 'add-system', 'add-container', 'add-component',
+  'group-selected', 'undo', 'redo', 'duplicate-selected', 'delete-selected',
+  'auto-arrange', 'new-view', 'duplicate-view', 'close-workspace', 'save',
+  'ai-compose', 'ai-interview', 'ai-review', 'ai-adr', 'ai-settings',
+])
+
 export interface Command {
   id: string
   label: string
@@ -511,7 +523,9 @@ export function getCommands(reactFlow: ReactFlowInstance | null): Command[] {
     }
   }
 
-  return commands
+  return store().readOnly
+    ? commands.filter((c) => !READONLY_BLOCKED_IDS.has(c.id))
+    : commands
 }
 
 const CATEGORY_ORDER: Command['category'][] = ['ai', 'create', 'edit', 'view', 'navigation', 'export']

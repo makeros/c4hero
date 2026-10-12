@@ -24,6 +24,7 @@ import NotFound from '@/components/shared/NotFound'
 import { loadFromLocalStorage } from '@/lib/fileIO'
 import { restoreDirHandle, getCurrentDirHandle } from '@/lib/folderIO'
 import { isCanvasRoute } from '@/lib/routes'
+import { getLockedWorkspace } from '@/lib/lockedWorkspace'
 
 const SearchDialog = lazy(() => import('@/components/search/SearchDialog'))
 const WelcomeScreen = lazy(() => import('@/components/welcome/WelcomeScreen'))
@@ -35,6 +36,8 @@ export default function App() {
   const pendingDelete = useWorkspaceStore((s) => s.pendingDelete)
   const cancelDelete = useWorkspaceStore((s) => s.cancelDelete)
   const presentationMode = useWorkspaceStore((s) => s.presentationMode)
+  const readOnly = useWorkspaceStore((s) => s.readOnly)
+  const setReadOnly = useWorkspaceStore((s) => s.setReadOnly)
   const aiPanelOpen = useWorkspaceStore((s) => s.aiPanelOpen)
   const setAiPanelOpen = useWorkspaceStore((s) => s.setAiPanelOpen)
   const aiSettingsOpen = useWorkspaceStore((s) => s.aiSettingsOpen)
@@ -48,6 +51,18 @@ export default function App() {
   useRouteSync()
   useRefreshRedirect()
 
+  // Boot straight into locked mode when this build was produced with
+  // `npm run build:viewer` — loads the baked-in workspace, then marks the
+  // store read-only so no further action can mutate it.
+  useEffect(() => {
+    const locked = getLockedWorkspace()
+    if (locked) {
+      loadWorkspace(locked)
+      setReadOnly(true)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   // Restore persisted dir handle on mount
   useEffect(() => {
     restoreDirHandle().catch(() => {})
@@ -55,6 +70,7 @@ export default function App() {
 
   // Crash recovery: landing on /workspace/* with no in-memory workspace
   useEffect(() => {
+    if (getLockedWorkspace()) return
     if (!location.pathname.startsWith('/workspace')) return
     const recovered = loadFromLocalStorage()
     if (recovered && !workspace) loadWorkspace(recovered)
@@ -174,7 +190,7 @@ export default function App() {
 
       {/* BYOK AI assistant — only on the canvas (a workspace open on a canvas
           route), never on the welcome/collection screens. */}
-      {onCanvas && (aiPanelOpen || aiSettingsOpen) && (
+      {onCanvas && (aiPanelOpen || aiSettingsOpen) && !readOnly && (
         <Suspense fallback={<LoadingDot />}>
           <AiPanel onClose={() => { setAiPanelOpen(false); setAiSettingsOpen(false) }} />
         </Suspense>

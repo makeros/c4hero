@@ -20,11 +20,12 @@ const cancelIdle = typeof cancelIdleCallback === 'function'
  *  Also writes to the current .dsl file handle and .c4hero.json sidecar if open. */
 export function useAutoSave() {
   const workspace = useWorkspaceStore((s) => s.workspace)
+  const readOnly = useWorkspaceStore((s) => s.readOnly)
   const timer = useRef<ReturnType<typeof setTimeout>>(null)
   const idleHandle = useRef<number>(0)
 
   useEffect(() => {
-    if (!workspace) return
+    if (!workspace || readOnly) return
 
     if (timer.current) clearTimeout(timer.current)
     timer.current = setTimeout(() => {
@@ -83,5 +84,5 @@ export function useAutoSave() {
       if (timer.current) clearTimeout(timer.current)
       cancelIdle(idleHandle.current)
     }
-  }, [workspace])
+  }, [workspace, readOnly])
 }

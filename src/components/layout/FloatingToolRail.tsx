@@ -42,6 +42,7 @@ const DIRECTION_LABELS: Record<LayoutDirection, string> = {
 }
 
 export default function FloatingToolRail() {
+  const readOnly = useWorkspaceStore((s) => s.readOnly)
   const workspace = useWorkspaceStore((s) => s.workspace)
   const activeViewKey = useWorkspaceStore((s) => s.activeViewKey)
   const resetAndRelayout = useWorkspaceStore((s) => s.resetAndRelayout)
@@ -166,7 +167,7 @@ export default function FloatingToolRail() {
           launcher is enabled (Show AI assistant). Two states: a filled accent
           background while the dialog is open, and a status dot (green = key set,
           grey = needs setup). Hidden entirely when the launcher is turned off. */}
-      {showLauncher && (
+      {showLauncher && !readOnly && (
       <button
         type="button"
         className="glass-panel"
@@ -227,7 +228,9 @@ export default function FloatingToolRail() {
         borderRadius: 'var(--radius-xl)',
       }}
     >
-      {/* Add element */}
+      {/* Add element — hidden entirely (not just disabled) in read-only mode:
+          there is nothing to add to a locked workspace. */}
+      {!readOnly && (
       <div style={{ position: 'relative' }}>
         <RailBtn
           ref={addBtnRef}
@@ -243,8 +246,12 @@ export default function FloatingToolRail() {
           </div>
         )}
       </div>
+      )}
 
-      {/* Auto-arrange */}
+      {/* Auto-arrange / lock-unlock — hidden entirely in read-only mode: both
+          mutate the view's layout, which a locked workspace must never allow. */}
+      {!readOnly && (
+      <>
       <RailSep />
       <div style={{ position: 'relative' }}>
         <RailBtn
@@ -352,11 +359,13 @@ export default function FloatingToolRail() {
           </>
         )}
       </div>
+      <RailSep />
+      </>
+      )}
 
       {/* Multi-select actions now live in the contextual MultiSelectBar */}
 
       {/* Multi-select mode toggle */}
-      <RailSep />
       <RailBtn
         icon={<MousePointerClick size={16} />}
         label={multiSelectMode ? 'Multi-select: ON (tap to turn off)' : 'Multi-select (tap multiple nodes)'}
@@ -379,7 +388,7 @@ export default function FloatingToolRail() {
       />
     </div>
     </div>
-    {addPanelOpen && breakpoint === 'mobile' && (
+    {addPanelOpen && breakpoint === 'mobile' && !readOnly && (
       <div ref={addElementFlyoutRef} data-mobile-add-flyout>
         <AddElementPanel onClose={() => setAddPanelOpen(false)} />
       </div>
