@@ -1,7 +1,8 @@
-import { useEffect, useState, type ReactNode } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { FileWarning, FileX } from 'lucide-react'
 import { renderMarkdownToSafeHtml } from '@/lib/markdown'
+import { HEADING_ID_PREFIX } from '@/lib/docLinks'
 
 // Standalone page for a document link's target — opened in a new tab via
 // `/document-view?path=<project-root-relative .md path>&title=<label>`
@@ -14,18 +15,52 @@ const DEFAULT_TITLE = 'Document — c4hero'
 // of the `path` query param, so it's handled as an early render-time branch
 // below rather than round-tripped through an effect's setState (the fetch
 // effect only ever runs once `path` is known to exist).
+// Every settled state carries the `path` it was fetched for; a state whose
+// path differs from the current one is treated as `loading` (see below), so
+// in-page navigation to another document resets to the loading screen
+// without a setState inside an effect.
 type FetchState =
   | { status: 'loading' }
-  | { status: 'loaded'; html: string }
+  | { status: 'loaded'; html: string; path: string }
   | { status: 'not-found'; path: string }
   | { status: 'error'; path: string }
+
+function scrollToFragment(root: HTMLElement | null, fragment: string, smooth: boolean): boolean {
+  if (!root || !fragment) return false
+  let id = fragment
+  try { id = decodeURIComponent(fragment) } catch { /* keep raw */ }
+  const el = root.querySelector<HTMLElement>(
+    `[id="${CSS.escape(HEADING_ID_PREFIX + id)}"], [id="${CSS.escape(id)}"]`,
+  )
+  if (!el) return false
+  const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+  el.scrollIntoView?.({ behavior: smooth && !reduce ? 'smooth' : 'auto', block: 'start' })
+  return true
+}
 
 export default function DocumentView() {
   const [searchParams] = useSearchParams()
   const path = searchParams.get('path')
   const title = searchParams.get('title')
 
-  const [state, setState] = useState<FetchState>({ status: 'loading' })
+  const navigate = useNavigate()
+  const { pathname, search, hash } = useLocation()
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const contentRef = useRef<HTMLDivElement>(null)
+
+  const [fetched, setState] = useState<FetchState>({ status: 'loading' })
+  const state: FetchState =
+    fetched.status !== 'loading' && fetched.path !== path ? { status: 'loading' } : fetched
+  const loadedHtml = state.status === 'loaded' ? state.html : null
+
+  // After a document renders: jump to its `#fragment` heading, else to the top.
+  // `hash` is read here but intentionally not a dependency — in-page anchor
+  // clicks scroll themselves (smoothly); this only runs once per load.
+  useEffect(() => {
+    if (loadedHtml === null) return
+    if (!scrollToFragment(contentRef.current, hash.slice(1), false)) scrollRef.current?.scrollTo?.(0, 0)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadedHtml])
 
   useEffect(() => {
     document.title = title?.trim() ? title : DEFAULT_TITLE
@@ -44,6 +79,12 @@ export default function DocumentView() {
     // middleware's single `decodeURIComponent` pass (vite.config.ts)
     // round-trips it unchanged.
     async function load() {
+      // A link that climbed above the project root (`..` survives
+      // normalisation) can't name a document.
+      if (docPath.split('/').includes('..')) {
+        setState({ status: 'not-found', path: docPath })
+        return
+      }
       try {
         const res = await fetch(`/__docs/${encodeURI(docPath)}`)
         if (cancelled) return
@@ -57,7 +98,7 @@ export default function DocumentView() {
         }
         const markdown = await res.text()
         if (cancelled) return
-        setState({ status: 'loaded', html: renderMarkdownToSafeHtml(markdown) })
+        setState({ status: 'loaded', path: docPath, html: renderMarkdownToSafeHtml(markdown, { docPath }) })
       } catch {
         if (!cancelled) setState({ status: 'error', path: docPath })
       }
@@ -116,9 +157,31 @@ export default function DocumentView() {
     )
   }
 
+  // Delegated handler for links in the rendered document. hrefs are real URLs
+  // (rewritten in markdown.ts), so modified/middle clicks fall through to the
+  // browser (new tab); only a plain left-click is intercepted.
+  function handleClick(e: MouseEvent<HTMLDivElement>) {
+    if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
+    const a = (e.target as Element).closest('a')
+    const href = a?.getAttribute('href')
+    if (!a || !href || a.target === '_blank') return
+    if (href.startsWith('#')) {
+      e.preventDefault()
+      if (scrollToFragment(contentRef.current, href.slice(1), true)) navigate({ pathname, search, hash: href }, { replace: true })
+    } else if (href.startsWith('/document-view?')) {
+      e.preventDefault()
+      navigate(href)
+    }
+  }
+
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--color-bg-primary)', padding: '48px 24px' }}>
+    <div
+      ref={scrollRef}
+      style={{ height: '100%', overflowY: 'auto', background: 'var(--color-bg-primary)', padding: '48px 24px', boxSizing: 'border-box' }}
+    >
       <div
+        ref={contentRef}
+        onClick={handleClick}
         className="document-view-content"
         style={{
           maxWidth: 760,
@@ -141,8 +204,16 @@ export default function DocumentView() {
           margin: 1.6em 0 0.6em;
         }
         .document-view-content h1:first-child, .document-view-content h2:first-child { margin-top: 0; }
+        .document-view-content h1 { font-size: 1.75em; }
+        .document-view-content h2 { font-size: 1.4em; }
+        .document-view-content h3 { font-size: 1.2em; }
+        .document-view-content h4 { font-size: 1.05em; }
+        .document-view-content h5, .document-view-content h6 { font-size: 1em; }
         .document-view-content p { margin: 0.8em 0; }
         .document-view-content a { color: var(--color-accent); }
+        .document-view-content a code { color: var(--color-accent); }
+        .document-view-content a.doc-code-link { text-decoration: none; }
+        .document-view-content a.doc-code-link:hover code { text-decoration: underline; }
         .document-view-content code {
           background: var(--color-surface-3);
           border-radius: var(--radius-sm);
@@ -163,6 +234,10 @@ export default function DocumentView() {
           color: var(--color-text-secondary);
         }
         .document-view-content ul, .document-view-content ol { padding-left: 1.4em; }
+        .document-view-content ul { list-style: disc; }
+        .document-view-content ol { list-style: decimal; }
+        .document-view-content ul ul { list-style: circle; }
+        .document-view-content li { margin: 0.25em 0; }
         .document-view-content hr { border: none; border-top: 1px solid var(--color-border); margin: 2em 0; }
         .document-view-content table { border-collapse: collapse; width: 100%; }
         .document-view-content th, .document-view-content td {
