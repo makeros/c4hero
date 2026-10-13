@@ -107,6 +107,12 @@ asset) — the environments differ only in how `/__docs/*` gets served:
   the project root (`..`, absolute paths, symlink escapes) — this is a Node
   `fs` read ultimately driven by user-authored DSL content, so the guard is
   load-bearing, not defensive boilerplate.
+- **Correction (2026-10-13):** "the project root" above means the *workspace's*
+  project root, `docsRootFor(workspace)` in `src/lib/docPath.ts` (nearest
+  ancestor with `.git`, else the workspace directory) — the same root
+  `link-doc` writes paths relative to — not the c4hero repo. Dev
+  (`--workspace`), `build --workspace` and `build:viewer` all use it; without
+  `--workspace`, dev still falls back to the c4hero repo.
 - **`npm run build`** (static, no server at runtime): referenced documents
   must be copied into `dist/__docs/` *before* the build is done. A **new,
   optional** `--workspace <dir>` flag (mirroring the existing convention in

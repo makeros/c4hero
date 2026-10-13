@@ -1,22 +1,19 @@
 /// <reference types="node" />
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import path from 'node:path'
+import { docsRootFor } from '@/lib/docPath'
 import { CliFailure } from './errors'
 
 const SKIPPED_DIRS = (name: string): boolean => name === 'node_modules' || name.startsWith('dist') || name.startsWith('.')
 
 /** Git root above `cwd` (a `.git` directory or worktree file), else `cwd` itself. */
 export function findRoot(cwd: string): string {
-  for (let dir = cwd; ; dir = path.dirname(dir)) {
-    if (existsSync(path.join(dir, '.git'))) return dir
-    if (path.dirname(dir) === dir) return cwd
-  }
+  return docsRootFor(cwd)
 }
 
-/** Git root (a `.git` directory or worktree file) above the workspace file,
- *  else the file's own directory. */
+/** Git root above the workspace file, else the file's own directory. */
 export function projectRootFor(file: string): string {
-  return findRoot(path.dirname(file))
+  return docsRootFor(path.dirname(file))
 }
 
 function scanDsl(dir: string, out: string[]): void {

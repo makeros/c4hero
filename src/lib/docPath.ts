@@ -2,8 +2,8 @@
 // markdown files inside the project root only. Dependency-free on purpose
 // (node:path / node:fs only) so Vite config, the CLI and the app build share
 // one implementation.
-import { existsSync, realpathSync } from 'node:fs'
-import { dirname, isAbsolute, relative, resolve } from 'node:path'
+import { existsSync, realpathSync, statSync } from 'node:fs'
+import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
 
 const MARKDOWN_EXTENSIONS = ['.md', '.markdown']
 
@@ -46,4 +46,36 @@ export function isInsideRootReal(root: string, target: string): boolean {
   } catch {
     return false
   }
+}
+
+/** Project root that document-link paths are relative to: the nearest ancestor
+ *  of `workspacePath` (a workspace directory or a `.dsl` file) holding `.git`
+ *  (a directory, or a file in a worktree), else the workspace directory itself.
+ *  The CLI (`link-doc`) and every serving path (dev, build, viewer) share it. */
+export function docsRootFor(workspacePath: string): string {
+  const abs = resolve(workspacePath)
+  let start = abs
+  try {
+    if (statSync(abs).isFile()) start = dirname(abs)
+  } catch {
+    // nonexistent: treat as a directory
+  }
+  for (let dir = start; ; dir = dirname(dir)) {
+    if (existsSync(join(dir, '.git'))) return dir
+    if (dirname(dir) === dir) return start
+  }
+}
+
+/** Resolves a `/__docs/<encoded-path>` request remainder against `root`.
+ *  `rejected` covers the textual guards (markdown extension, hidden/`..`
+ *  segments, escaping the root). Throws URIError on malformed encoding. The
+ *  caller must still check `isInsideRootReal` once the file exists. */
+export function resolveDocRequest(
+  encodedPath: string,
+  root: string,
+): { absolute: string; rejected: boolean } {
+  const decoded = decodeURIComponent(encodedPath)
+  const absolute = resolve(root, decoded)
+  const rejected = !hasMarkdownExtension(decoded) || hasHiddenSegment(decoded) || !isInsideRoot(root, absolute)
+  return { absolute, rejected }
 }

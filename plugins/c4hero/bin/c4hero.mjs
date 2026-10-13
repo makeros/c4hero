@@ -3963,19 +3963,69 @@ var useWorkspaceStore = create()(immer((...a) => ({
 	...createUndoSlice(...a)
 })));
 //#endregion
+//#region src/lib/docPath.ts
+var MARKDOWN_EXTENSIONS = [".md", ".markdown"];
+function hasMarkdownExtension(docPath) {
+	const lower = docPath.toLowerCase();
+	return MARKDOWN_EXTENSIONS.some((ext) => lower.endsWith(ext));
+}
+/** True when any segment starts with `.` — blocks dotfiles/dirs and `..`. */
+function hasHiddenSegment(docPath) {
+	return docPath.split(/[\\/]/).some((segment) => segment.startsWith("."));
+}
+/** Textual allowlist: why `docPath` is not an acceptable document path, or
+*  null when it is. Does not touch the filesystem. */
+function docPathProblem(docPath) {
+	if (isAbsolute(docPath) || /^[a-zA-Z]:/.test(docPath)) return "must be relative to the project root, not absolute";
+	if (!hasMarkdownExtension(docPath)) return "must end in .md or .markdown";
+	if (hasHiddenSegment(docPath)) return "must not contain hidden or '..' segments";
+	return null;
+}
+/** True when `target` is `root` itself or lies inside it (textual, no symlinks). */
+function isInsideRoot(root, target) {
+	const rel = relative(root, target);
+	return rel === "" || !(rel.startsWith("..") || isAbsolute(rel));
+}
+/** Like `isInsideRoot` but on symlink-resolved paths. `target` need not exist:
+*  its nearest existing ancestor is resolved instead. */
+function isInsideRootReal(root, target) {
+	let probe = resolve(target);
+	while (!existsSync(probe)) {
+		const parent = dirname(probe);
+		if (parent === probe) return false;
+		probe = parent;
+	}
+	try {
+		return isInsideRoot(realpathSync(root), realpathSync(probe));
+	} catch {
+		return false;
+	}
+}
+/** Project root that document-link paths are relative to: the nearest ancestor
+*  of `workspacePath` (a workspace directory or a `.dsl` file) holding `.git`
+*  (a directory, or a file in a worktree), else the workspace directory itself.
+*  The CLI (`link-doc`) and every serving path (dev, build, viewer) share it. */
+function docsRootFor(workspacePath) {
+	const abs = resolve(workspacePath);
+	let start = abs;
+	try {
+		if (statSync(abs).isFile()) start = dirname(abs);
+	} catch {}
+	for (let dir = start;; dir = dirname(dir)) {
+		if (existsSync(join(dir, ".git"))) return dir;
+		if (dirname(dir) === dir) return start;
+	}
+}
+//#endregion
 //#region src/cli/discover.ts
 var SKIPPED_DIRS = (name) => name === "node_modules" || name.startsWith("dist") || name.startsWith(".");
 /** Git root above `cwd` (a `.git` directory or worktree file), else `cwd` itself. */
 function findRoot(cwd) {
-	for (let dir = cwd;; dir = path.dirname(dir)) {
-		if (existsSync(path.join(dir, ".git"))) return dir;
-		if (path.dirname(dir) === dir) return cwd;
-	}
+	return docsRootFor(cwd);
 }
-/** Git root (a `.git` directory or worktree file) above the workspace file,
-*  else the file's own directory. */
+/** Git root above the workspace file, else the file's own directory. */
 function projectRootFor(file) {
-	return findRoot(path.dirname(file));
+	return docsRootFor(path.dirname(file));
 }
 function scanDsl(dir, out) {
 	for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -8200,45 +8250,6 @@ var deploymentCommands = [{
 		return handler(openForEdit(args, ctx), args);
 	}
 }];
-//#endregion
-//#region src/lib/docPath.ts
-var MARKDOWN_EXTENSIONS = [".md", ".markdown"];
-function hasMarkdownExtension(docPath) {
-	const lower = docPath.toLowerCase();
-	return MARKDOWN_EXTENSIONS.some((ext) => lower.endsWith(ext));
-}
-/** True when any segment starts with `.` — blocks dotfiles/dirs and `..`. */
-function hasHiddenSegment(docPath) {
-	return docPath.split(/[\\/]/).some((segment) => segment.startsWith("."));
-}
-/** Textual allowlist: why `docPath` is not an acceptable document path, or
-*  null when it is. Does not touch the filesystem. */
-function docPathProblem(docPath) {
-	if (isAbsolute(docPath) || /^[a-zA-Z]:/.test(docPath)) return "must be relative to the project root, not absolute";
-	if (!hasMarkdownExtension(docPath)) return "must end in .md or .markdown";
-	if (hasHiddenSegment(docPath)) return "must not contain hidden or '..' segments";
-	return null;
-}
-/** True when `target` is `root` itself or lies inside it (textual, no symlinks). */
-function isInsideRoot(root, target) {
-	const rel = relative(root, target);
-	return rel === "" || !(rel.startsWith("..") || isAbsolute(rel));
-}
-/** Like `isInsideRoot` but on symlink-resolved paths. `target` need not exist:
-*  its nearest existing ancestor is resolved instead. */
-function isInsideRootReal(root, target) {
-	let probe = resolve(target);
-	while (!existsSync(probe)) {
-		const parent = dirname(probe);
-		if (parent === probe) return false;
-		probe = parent;
-	}
-	try {
-		return isInsideRoot(realpathSync(root), realpathSync(probe));
-	} catch {
-		return false;
-	}
-}
 //#endregion
 //#region src/cli/commands/docs.ts
 function resolveTarget(ws, ref, match) {

@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { findReferencedDocumentPaths, planDocumentCopies } from './documentCollection'
 import { serializeDSL } from './dsl'
+import { docsRootFor } from './docPath'
 import type { Workspace, DocLink } from '@/types/model'
 
 function ws(overrides: Partial<Workspace['model']> = {}): Workspace {
@@ -105,6 +106,21 @@ describe('planDocumentCopies', () => {
         const plan = planDocumentCopies([file], dir)
         expect(plan.copies).toEqual([{ from: join(dir, 'docs', 'a.md'), to: '__docs/docs/a.md' }])
         expect(plan.missing).toEqual(['docs/b.md'])
+    })
+
+    it('finds docs via docsRootFor when the workspace sits in a subfolder of its own repo', () => {
+        dir = mkdtempSync(join(tmpdir(), 'c4hero-doc-collection-'))
+        mkdirSync(join(dir, '.git'))
+        mkdirSync(join(dir, 'docs'))
+        mkdirSync(join(dir, 'arch'))
+        writeFileSync(join(dir, 'docs', 'a.md'), '# A', 'utf8')
+        const file = join(dir, 'arch', 'workspace.dsl')
+        writeFileSync(file, serializeDSL(ws({
+            people: [{ id: 'p1', type: 'person', name: 'P', tags: [], properties: {}, documents: [DOC_A] }],
+        })), 'utf8')
+        const plan = planDocumentCopies([file], docsRootFor(join(dir, 'arch')))
+        expect(plan.copies).toEqual([{ from: join(dir, 'docs', 'a.md'), to: '__docs/docs/a.md' }])
+        expect(plan.missing).toEqual([])
     })
 
     it('dedupes a path referenced by two elements into a single copy', () => {

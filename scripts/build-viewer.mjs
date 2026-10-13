@@ -15,6 +15,7 @@ import { existsSync, statSync, mkdirSync, copyFileSync } from 'node:fs'
 import path from 'node:path'
 import { createServer } from 'vite'
 import { sidecarName } from '../src/lib/sidecarName.ts'
+import { docsRootFor } from '../src/lib/docPath.ts'
 
 const args = process.argv.slice(2)
 const flagIndex = args.findIndex((a) => a === '--workspace' || a.startsWith('--workspace='))
@@ -93,6 +94,7 @@ const viteBin = path.join(
 // build (Vite's default `emptyOutDir` behavior for an outDir inside the
 // project root), which would wipe anything copied in ahead of it.
 async function copyReferencedDocuments(workspacePath, root) {
+  const docsRoot = docsRootFor(workspacePath)
   const server = await createServer({
     configFile: path.join(root, 'vite.config.ts'),
     server: { middlewareMode: true },
@@ -103,7 +105,7 @@ async function copyReferencedDocuments(workspacePath, root) {
   let plan
   try {
     const { planDocumentCopies } = await server.ssrLoadModule('/src/lib/documentCollection.ts')
-    plan = planDocumentCopies([workspacePath], root)
+    plan = planDocumentCopies([workspacePath], docsRoot)
   } finally {
     await server.close()
   }

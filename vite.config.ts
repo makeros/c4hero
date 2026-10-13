@@ -5,8 +5,8 @@ import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 import path from 'path'
 import { execSync } from 'child_process'
-import { hasMarkdownExtension, hasHiddenSegment } from './src/lib/docPath.ts'
-import { readFileSync, existsSync, statSync, readdirSync, mkdirSync, copyFileSync, realpathSync } from 'fs'
+import { docsRootFor, isInsideRootReal, resolveDocRequest } from './src/lib/docPath.ts'
+import { readFileSync, existsSync, statSync, readdirSync, mkdirSync, copyFileSync } from 'fs'
 
 // Set by scripts/build-plugin.mjs: builds the headless export viewer into
 // plugins/c4hero/viewer/ (relative base, no PWA, no document collection, a
@@ -30,47 +30,6 @@ const LOCKED_WORKSPACE_RESOLVED_ID = '\0' + LOCKED_WORKSPACE_VIRTUAL_ID
 // build are covered by the `document-links` plugin below; the locked viewer
 // build (`npm run build:viewer`) is a separate script/plugin pairing.
 const DOCS_MOUNT_PREFIX = '/__docs/'
-
-// Resolves a `/__docs/<encoded-path>` request's encoded remainder to an
-// absolute path, decoding it as a single percent-encoded segment (so an
-// encoded `/` round-trips back to a real subdirectory separator) and
-// reporting whether the result should be rejected — either because it fails
-// the markdown-extension/hidden-segment allowlist, or because it normalizes
-// outside `projectRoot` — the same containment check `planDocumentCopies`
-// (src/lib/documentCollection.ts) applies at build time, kept in lockstep
-// here for the dev-time request path. This only covers the TEXTUAL check;
-// the caller still has to re-check the REAL (symlink-resolved) path once the
-// candidate file is confirmed to exist — see the `configureServer` handler
-// below.
-function resolveDocPath(
-  encodedPath: string,
-  projectRoot: string,
-): { absolute: string; rejected: boolean } {
-  const decoded = decodeURIComponent(encodedPath)
-  const absolute = path.resolve(projectRoot, decoded)
-  if (!hasMarkdownExtension(decoded) || hasHiddenSegment(decoded)) {
-    return { absolute, rejected: true }
-  }
-  const rel = path.relative(projectRoot, absolute)
-  const escapesRoot = rel === '' ? false : rel.startsWith('..') || path.isAbsolute(rel)
-  return { absolute, rejected: escapesRoot }
-}
-
-// Re-checks containment against the REAL (symlink-resolved) path. Node's
-// existsSync/statSync/readFileSync all follow symlinks, so a file that is
-// textually inside `projectRoot` but is actually a symlink pointing outside
-// it would otherwise be served anyway. Resolves `projectRoot` fresh too, in
-// case the root itself involves a symlink.
-function isRealPathContained(absolute: string, projectRoot: string): boolean {
-  try {
-    const realAbsolute = realpathSync(absolute)
-    const realRoot = realpathSync(projectRoot)
-    const rel = path.relative(realRoot, realAbsolute)
-    return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel))
-  } catch {
-    return false
-  }
-}
 
 // `closeBundle` runs after `tsc -b`'s separate pass, inside the already-
 // bundled `vite.config.ts` module — which means a plain `import` of
@@ -126,6 +85,10 @@ export default defineConfig({
         resolvedOutDir = config.build.outDir
       },
       configureServer(server) {
+        // Document-link paths are relative to the workspace's project root
+        // (git root of the --workspace folder), not to this repo.
+        const devWorkspace = process.env.VITE_DEV_WORKSPACE_PATH
+        const docsRoot = devWorkspace ? docsRootFor(devWorkspace) : __dirname
         server.middlewares.use((req, res, next) => {
           if (!req.url || !req.url.startsWith(DOCS_MOUNT_PREFIX)) return next()
 
@@ -134,7 +97,7 @@ export default defineConfig({
           let absolute: string
           let rejected: boolean
           try {
-            ;({ absolute, rejected } = resolveDocPath(encodedPath, __dirname))
+            ;({ absolute, rejected } = resolveDocRequest(encodedPath, docsRoot))
           } catch {
             res.statusCode = 400
             res.end('Bad request')
@@ -153,7 +116,7 @@ export default defineConfig({
             return
           }
 
-          if (!isRealPathContained(absolute, __dirname)) {
+          if (!isInsideRootReal(docsRoot, absolute)) {
             res.statusCode = 400
             res.end('Bad request')
             return
@@ -188,7 +151,7 @@ export default defineConfig({
         let plan: { copies: Array<{ from: string; to: string }>; missing: string[] }
         try {
           const { planDocumentCopies } = await server.ssrLoadModule('/src/lib/documentCollection.ts')
-          plan = planDocumentCopies(dslFilePaths, __dirname)
+          plan = planDocumentCopies(dslFilePaths, docsRootFor(workspaceDir))
         } finally {
           await server.close()
         }
