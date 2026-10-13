@@ -39,3 +39,5 @@ interface SpeechRecognitionResultEvent {
     }
   }
 }
+// True only in the export viewer build (vite.config.ts); false everywhere else.
+declare const __EXPORT_MODE__: boolean

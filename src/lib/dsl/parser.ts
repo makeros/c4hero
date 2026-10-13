@@ -120,9 +120,18 @@ export interface ParseError {
     column: number
 }
 
+/** A statement the parser consumed without storing it in the model, so a
+ *  serialize round trip drops it. `line` is 1-based; `text` is the statement's
+ *  head as written (tokens up to its first `{`). */
+export interface SkippedConstruct {
+    line: number
+    text: string
+}
+
 export interface ParseResult {
     workspace: Workspace
     errors: ParseError[]
+    skipped: SkippedConstruct[]
 }
 
 // ─── ID Generation ───────────────────────────────────────────────────
@@ -252,6 +261,7 @@ export class ContextAwareParser {
     }
 
     skipBraceBlock(): void {
+        if (this.check('LBRACE') && !this.insideUnknownDirective) this.noteSkipped(this.pos - 1)
         if (!this.match('LBRACE')) return
         let depth = 1
         while (depth > 0 && this.peekType() !== 'EOF') {
@@ -266,12 +276,35 @@ export class ContextAwareParser {
      *  block. Used to gracefully ignore unknown keywords/identifiers in element bodies
      *  without mistakenly consuming the parent's closing `}`. */
     skipUnknownDirective(): void {
+        this.noteSkipped(this.pos - 1)
         while (this.peekType() !== 'NEWLINE' && this.peekType() !== 'EOF' && !this.check('LBRACE')) {
             this.advance()
         }
         if (this.peekType() === 'NEWLINE') this.advance()
         this.skipNewlines()
+        this.insideUnknownDirective = true
         if (this.check('LBRACE')) this.skipBraceBlock()
+        this.insideUnknownDirective = false
+    }
+
+    /** Statements consumed without being modelled; see SkippedConstruct. */
+    skipped: SkippedConstruct[] = []
+    private insideUnknownDirective = false
+
+    /** Record the statement whose keyword sits at or before token `anchor`. */
+    noteSkipped(anchor: number): void {
+        let i = Math.max(anchor, 0)
+        while (i > 0 && (this.tokens[i].type === 'NEWLINE' || this.tokens[i].type === 'COMMENT')) i--
+        let start = i
+        while (start > 0 && this.tokens[start - 1].type !== 'NEWLINE' && this.tokens[start - 1].type !== 'LBRACE') start--
+        const parts: string[] = []
+        for (let j = start; j < this.tokens.length; j++) {
+            const t = this.tokens[j]
+            if (t.type === 'NEWLINE' || t.type === 'LBRACE' || t.type === 'EOF') break
+            parts.push(t.type === 'STRING' ? `"${t.value}"` : t.value)
+        }
+        const entry = { line: this.tokens[start].line, text: parts.join(' ') }
+        if (!this.skipped.some(k => k.line === entry.line && k.text === entry.text)) this.skipped.push(entry)
     }
 
     // ─── Registration ────────────────────────────────────────────────
@@ -471,7 +504,7 @@ export class ContextAwareParser {
             if (this.check('KEYWORD', 'extends') || this.check('IDENTIFIER', 'extends')) {
                 this.skipToNextLine()
                 this.skipBraceBlock()
-                return { workspace, errors: this.errors }
+                return { workspace, errors: this.errors, skipped: this.skipped }
             }
 
             workspace.name = this.readOptionalString() || undefined
@@ -489,7 +522,7 @@ export class ContextAwareParser {
             }
         }
 
-        return { workspace, errors: this.errors }
+        return { workspace, errors: this.errors, skipped: this.skipped }
     }
 
     private createEmptyWorkspace(): Workspace {
@@ -567,6 +600,7 @@ export class ContextAwareParser {
                     while (this.check('STRING') || this.check('IDENTIFIER') || this.check('NUMBER')) this.advance()
                     this.skipNewlines()
                     if (this.check('LBRACE')) this.skipBraceBlock()
+                    else this.noteSkipped(this.pos - 1)
                 }
             } else {
                 this.advance()
@@ -676,5 +710,6 @@ export function parse(input: string): ParseResult {
     return {
         workspace: ws,
         errors,
+        skipped: parser.skipped,
     }
 }

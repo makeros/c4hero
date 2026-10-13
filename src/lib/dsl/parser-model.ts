@@ -600,7 +600,10 @@ function parseSimpleElementBlock(p: ContextAwareParser, element: Person | Compon
             continue
         }
 
+        // Anything else (`-> x`, an identifier) is not modelled: record it so the
+        // lossy guard sees it instead of dropping it silently.
         p.advance()
+        p.skipUnknownDirective()
     }
 }
 

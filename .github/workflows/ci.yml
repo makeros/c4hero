@@ -135,6 +135,30 @@ jobs:
       - run: npm ci
       - run: npm run build
 
+  # The Claude Code plugin ships a committed CLI bundle and export viewer.
+  # Rebuild them and fail if the committed copies are stale or incomplete.
+  plugin-bundle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build:plugin
+      - name: Fail if the committed bundle is stale
+        run: |
+          git diff --exit-code -- plugins/c4hero/bin plugins/c4hero/viewer
+          untracked="$(git status --porcelain -- plugins/c4hero/bin plugins/c4hero/viewer)"
+          if [ -n "$untracked" ]; then
+            echo "Plugin bundle differs from the committed copy:"
+            echo "$untracked"
+            exit 1
+          fi
+      - name: Validate DSL examples in the plugin skills
+        run: node scripts/check-skill-dsl-examples.mjs
+
   security:
     runs-on: ubuntu-latest
     steps:

@@ -16,6 +16,25 @@ function deepCloneMaybeDraft<T>(value: T): T {
   return structuredClone(isDraft(value) ? (current(value as object) as T) : value)
 }
 
+/** Sequential renumber + membership recompute after any step edit.
+ *
+ *  Orders regenerate 1..n, which flattens parallel-sequence numbering — the
+ *  editor is a linear list, so an edit is the user restating the sequence as
+ *  linear. Membership is a projection of the steps (steps are all that
+ *  serializes), so elements whose last step died drop out here. */
+export function normalizeDynamicView(ws: Workspace, view: View): void {
+  view.relationships.forEach((step, i) => { step.order = String(i + 1) })
+  const endpoints = new Set<string>()
+  for (const step of view.relationships) {
+    const rel = ws.model.relationships.find(r => r.id === step.id)
+    const sourceId = step.sourceId ?? rel?.sourceId
+    const destId = step.destinationId ?? rel?.destinationId
+    if (sourceId) endpoints.add(sourceId)
+    if (destId) endpoints.add(destId)
+  }
+  view.elements = view.elements.filter(e => endpoints.has(e.id))
+}
+
 /** Fill view arrays and model collections that predate their introduction.
  *  Workspaces persisted (or crash-recovery-snapshotted) before dynamic and
  *  deployment views existed lack those arrays; every VIEW_ARRAY_KEYS loop and

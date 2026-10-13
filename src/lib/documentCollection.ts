@@ -5,6 +5,7 @@
 // one URL shape, three environments".
 import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs'
 import { isAbsolute, relative, resolve, sep } from 'node:path'
+import { hasHiddenSegment, hasMarkdownExtension } from './docPath'
 import { parseDSL } from './dsl'
 import { forEachElementHelper } from '@/store/workspace-helpers'
 import type { Workspace } from '@/types/model'
@@ -43,27 +44,6 @@ export interface DocumentCopyPlan {
     copies: Array<{ from: string; to: string }>
     /** Referenced paths with no file on disk, or that fail the project-root containment check. */
     missing: string[]
-}
-
-// This feature's scope is local markdown files only (see the plan's Goal) —
-// never serve/copy an arbitrary repo file (`.env`, `package.json`, etc.) just
-// because some `documents[].path` happens to point at it. Kept in lockstep
-// with vite.config.ts's dev middleware, which applies the identical
-// restriction to the live `/__docs/*` request path.
-const MARKDOWN_EXTENSIONS = ['.md', '.markdown']
-
-function hasMarkdownExtension(docPath: string): boolean {
-    const lower = docPath.toLowerCase()
-    return MARKDOWN_EXTENSIONS.some((ext) => lower.endsWith(ext))
-}
-
-// Rejects any path with a segment starting with `.` — blocks dotfiles/dirs
-// (`.env`, `.git/config`, …) even nested, and as a side effect also rejects
-// any `..` segment outright (a stricter, earlier-exit guard than the
-// resolve()-based containment check below; kept as well since it covers
-// absolute-path/escape shapes this segment check doesn't).
-function hasHiddenSegment(docPath: string): boolean {
-    return docPath.split(/[\\/]/).some((segment) => segment.startsWith('.'))
 }
 
 /**

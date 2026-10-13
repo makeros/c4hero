@@ -149,6 +149,9 @@ export interface WorkspaceState extends UndoState {
   deleteElement: (id: string) => void
   deleteElements: (ids: string[]) => void
   duplicateElements: (ids: string[]) => string[]
+  /** Reparent a container to another software system, or a component to another container,
+   *  keeping its id. Returns false (no change) on a missing id, a type mismatch or the same parent. */
+  moveElement: (id: string, newParentId: string) => boolean
 
   // Group CRUD
   addGroup: (name: string, elementIds?: string[]) => string

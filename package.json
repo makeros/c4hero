@@ -29,6 +29,7 @@
   "scripts": {
     "dev": "node scripts/dev.mjs",
     "build:viewer": "node scripts/build-viewer.mjs",
+    "build:plugin": "node scripts/build-plugin.mjs",
     "build": "node scripts/build-app.mjs",
     "typecheck": "tsc -b",
     "lint": "eslint .",

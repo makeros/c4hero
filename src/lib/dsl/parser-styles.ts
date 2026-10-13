@@ -99,7 +99,7 @@ function parseRelationshipStyleBlock(p: ContextAwareParser): RelationshipStyle |
 
 function applyStyleProperty(p: ContextAwareParser, style: ElementStyle, prop: string): void {
     const val = p.readStyleValue()
-    if (val === undefined) return
+    if (val === undefined) { p.noteSkipped(p.pos - 1); return }
 
     switch (prop) {
         case 'background': style.background = val; break
@@ -123,13 +123,14 @@ function applyStyleProperty(p: ContextAwareParser, style: ElementStyle, prop: st
             if (!isNaN(n)) style.strokeWidth = n
             break
         }
-        // Silently consume unknown properties
+        // Properties the model has no field for (width, height, metadata, routing, ...)
+        default: p.noteSkipped(p.pos - 1)
     }
 }
 
 function applyRelStyleProperty(p: ContextAwareParser, style: RelationshipStyle, prop: string): void {
     const val = p.readStyleValue()
-    if (val === undefined) return
+    if (val === undefined) { p.noteSkipped(p.pos - 1); return }
 
     switch (prop) {
         case 'color': case 'colour': style.color = val; break
@@ -149,6 +150,7 @@ function applyRelStyleProperty(p: ContextAwareParser, style: RelationshipStyle, 
             if (!isNaN(n)) style.opacity = n
             break
         }
-        // Silently consume unknown properties
+        // Properties the model has no field for (width, height, metadata, routing, ...)
+        default: p.noteSkipped(p.pos - 1)
     }
 }

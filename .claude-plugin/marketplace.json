@@ -1,0 +1,21 @@
+{
+  "name": "c4hero",
+  "description": "c4hero: C4 architecture modelling tools for Claude Code",
+  "owner": {
+    "name": "c4hero maintainers"
+  },
+  "plugins": [
+    {
+      "name": "c4hero",
+      "source": "./plugins/c4hero",
+      "description": "Model C4 architecture in Structurizr DSL through the c4hero CLI, with skills, commands and a validation hook",
+      "version": "0.1.0",
+      "author": {
+        "name": "c4hero maintainers"
+      },
+      "homepage": "https://c4hero.com",
+      "license": "Apache-2.0",
+      "keywords": ["c4", "architecture", "structurizr", "diagrams", "dsl"]
+    }
+  ]
+}

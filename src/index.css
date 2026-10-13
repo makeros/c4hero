@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "@xyflow/react/dist/style.css";
+@source not "../plugins";
 
 @theme {
   /* Surfaces — canonical c4hero palette */

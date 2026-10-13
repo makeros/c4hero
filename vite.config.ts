@@ -1,13 +1,19 @@
 import { defineConfig } from 'vitest/config'
-import { createServer } from 'vite'
+import { createServer, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 import path from 'path'
 import { execSync } from 'child_process'
+import { hasMarkdownExtension, hasHiddenSegment } from './src/lib/docPath.ts'
 import { readFileSync, existsSync, statSync, readdirSync, mkdirSync, copyFileSync, realpathSync } from 'fs'
 
-const commitHash = execSync('git rev-parse --short HEAD').toString().trim()
+// Set by scripts/build-plugin.mjs: builds the headless export viewer into
+// plugins/c4hero/viewer/ (relative base, no PWA, no document collection, a
+// fixed commit label so consecutive builds are byte-identical).
+const exportBuild = process.env.C4HERO_EXPORT_BUILD === '1'
+
+const commitHash = exportBuild ? 'export' : execSync('git rev-parse --short HEAD').toString().trim()
 const appVersion = JSON.parse(readFileSync(path.resolve(__dirname, 'package.json'), 'utf8')).version
 
 // Virtual module that bakes a single workspace's DSL (and optional sidecar)
@@ -24,26 +30,6 @@ const LOCKED_WORKSPACE_RESOLVED_ID = '\0' + LOCKED_WORKSPACE_VIRTUAL_ID
 // build are covered by the `document-links` plugin below; the locked viewer
 // build (`npm run build:viewer`) is a separate script/plugin pairing.
 const DOCS_MOUNT_PREFIX = '/__docs/'
-
-// This feature's scope is local markdown files only (see the plan's Goal) —
-// never serve `.env`, `.git/**`, or any other arbitrary repo file over HTTP
-// just because it happens to live under the project root. Kept in lockstep
-// with `planDocumentCopies` (src/lib/documentCollection.ts), which applies
-// the identical restriction at build time.
-const MARKDOWN_EXTENSIONS = ['.md', '.markdown']
-
-function hasMarkdownExtension(docPath: string): boolean {
-  const lower = docPath.toLowerCase()
-  return MARKDOWN_EXTENSIONS.some((ext) => lower.endsWith(ext))
-}
-
-// Rejects any path with a segment starting with `.` — blocks dotfiles/dirs
-// (`.env`, `.git/config`, …) even nested, and as a side effect also rejects
-// any `..` segment outright ahead of the resolve()-based containment check
-// below.
-function hasHiddenSegment(docPath: string): boolean {
-  return docPath.split(/[\\/]/).some((segment) => segment.startsWith('.'))
-}
 
 // Resolves a `/__docs/<encoded-path>` request's encoded remainder to an
 // absolute path, decoding it as a single percent-encoded segment (so an
@@ -134,7 +120,7 @@ export default defineConfig({
         return `export default ${JSON.stringify({ dsl, sidecar, name })}`
       },
     },
-    {
+    ...(exportBuild ? [] : [{
       name: 'document-links',
       configResolved(config) {
         resolvedOutDir = config.build.outDir
@@ -222,8 +208,8 @@ export default defineConfig({
           )
         }
       },
-    },
-    VitePWA({
+    } satisfies Plugin]),
+    ...(exportBuild ? [] : [VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['c4-logo.png', 'apple-touch-icon.png'],
       manifest: {
@@ -246,18 +232,22 @@ export default defineConfig({
         globIgnores: ['**/c4-logo.svg', '**/favicon.svg'],
       },
       devOptions: { enabled: false },
-    }),
+    })]),
   ],
   define: {
     __COMMIT_HASH__: JSON.stringify(commitHash),
     __APP_VERSION__: JSON.stringify(appVersion),
+    __EXPORT_MODE__: JSON.stringify(exportBuild),
   },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
     },
   },
+  base: exportBuild ? './' : '/',
+  publicDir: exportBuild ? false : 'public',
   build: {
+    ...(exportBuild ? { outDir: 'plugins/c4hero/viewer', emptyOutDir: true } : {}),
     rollupOptions: {
       output: {
         manualChunks(id: string) {

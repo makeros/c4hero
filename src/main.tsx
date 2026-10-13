@@ -19,8 +19,10 @@ import {
 
 const log = createLogger('global')
 
-initSentry()
-initCloudflareAnalytics()
+if (!__EXPORT_MODE__) {
+  initSentry()
+  initCloudflareAnalytics()
+}
 
 // Test helpers — only exposed in dev mode for E2E tests
 if (import.meta.env.DEV) {
@@ -144,4 +146,6 @@ createRoot(document.getElementById('root')!).render(
 // Report Core Web Vitals through the structured logger so any configured
 // remote transport gets perf telemetry too. Cloudflare Web Analytics collects
 // aggregate page-load metrics separately when enabled for the hosted app.
-import('./lib/webVitals').then(({ reportWebVitals }) => reportWebVitals())
+if (!__EXPORT_MODE__) {
+  import('./lib/webVitals').then(({ reportWebVitals }) => reportWebVitals())
+}

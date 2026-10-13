@@ -6,7 +6,7 @@ import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist', 'coverage', '.claude', '.worktrees']),
+  globalIgnores(['dist', 'coverage', '.claude', '.worktrees', 'plugins/c4hero/bin', 'plugins/c4hero/viewer']),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [

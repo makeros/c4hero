@@ -8,16 +8,17 @@
 
 import type { Workspace } from '@/types/model'
 import { parse } from './parser'
-import type { ParseError } from './parser'
+import type { ParseError, SkippedConstruct } from './parser'
 import { serialize } from './serializer'
 import { generateDefaultViews } from './auto-views'
 
-export type { ParseError }
+export type { ParseError, SkippedConstruct }
 export { GroupSerializationError } from './serializer'
 
 export interface ParseDSLResult {
     workspace: Workspace
     errors: ParseError[]
+    skipped: SkippedConstruct[]
 }
 
 /**

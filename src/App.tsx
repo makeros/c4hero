@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useState, useRef } from 'react'
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom'
 import LoadingDot from '@/components/shared/LoadingDot'
-import { ReactFlowProvider } from '@xyflow/react'
+import { ReactFlowProvider, useReactFlow } from '@xyflow/react'
 import { useWorkspaceStore } from '@/store/workspace'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
 import { useAutoSave } from '@/hooks/useAutoSave'
@@ -64,6 +64,13 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Export viewer build (`npm run build:plugin`): load the workspace the CLI
+  // injects, read-only. Compile-time constant, so normal builds drop this.
+  useEffect(() => {
+    if (!__EXPORT_MODE__) return
+    void import('@/lib/exportViewer').then((m) => m.bootExportWorkspace())
+  }, [])
+
   // Restore persisted dir handle on mount
   useEffect(() => {
     restoreDirHandle().catch(() => {})
@@ -102,6 +109,7 @@ export default function App() {
             <Canvas />
           </ErrorBoundary>
         </main>
+        {__EXPORT_MODE__ ? <ExportBridge /> : <>
         <nav aria-label="Workspace navigation"><FloatingTopPill /></nav>
         <MultiSelectBar />
         <nav aria-label="Tools"><FloatingToolRail /></nav>
@@ -113,6 +121,7 @@ export default function App() {
         <CanvasHints />
         <div id="c4hero-live" aria-live="polite" aria-atomic="true" className="sr-only" />
         <div className="commit-hash">v{__APP_VERSION__} · {__COMMIT_HASH__}</div>
+        </>}
       </div>
       {searchOpen && <Suspense fallback={<LoadingDot />}><SearchDialog /></Suspense>}
     </ReactFlowProvider>
@@ -145,9 +154,11 @@ export default function App() {
       <Routes>
         {/* Startup — no collection open */}
         <Route path="/" element={
-          <Suspense fallback={<LoadingDot />}>
-            <WelcomeScreen initialView="startup" />
-          </Suspense>
+          __EXPORT_MODE__ ? <LoadingDot /> : (
+            <Suspense fallback={<LoadingDot />}>
+              <WelcomeScreen initialView="startup" />
+            </Suspense>
+          )
         } />
 
         {/* Collection home — folder open, pick/create workspace */}
@@ -198,7 +209,7 @@ export default function App() {
       {/* What's-new pill — outside routes so it greets the user wherever they
           land (welcome or canvas); presentation mode returns earlier and never
           shows it. Renders nothing unless an unseen release exists. */}
-      <WhatsNewPill />
+      {!__EXPORT_MODE__ && <WhatsNewPill />}
 
       {/* BYOK AI assistant — only on the canvas (a workspace open on a canvas
           route), never on the welcome/collection screens. */}
@@ -209,6 +220,15 @@ export default function App() {
       )}
     </>
   )
+}
+
+// Export viewer only: hands the live React Flow instance to the export API.
+function ExportBridge() {
+  const rf = useReactFlow()
+  useEffect(() => {
+    void import('@/lib/exportViewer').then((m) => m.installExportApi(rf))
+  }, [rf])
+  return null
 }
 
 function PresentationExitPill() {

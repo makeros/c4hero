@@ -52,6 +52,17 @@ You never have to write that by hand — but you can. Already have a `.dsl` file
 
 A more detailed feature catalogue lives in [`docs/FEATURES.md`](docs/FEATURES.md).
 
+## Use with Claude Code
+
+The c4hero plugin lets Claude Code model your architecture through a CLI built on c4hero's own parser and serializer, so edits stay valid Structurizr DSL. It adds skills for modelling and DSL syntax, slash commands (`/c4hero:link-docs`, `/c4hero:review-model`, `/c4hero:sync-from-code`, `/c4hero:export`), a hook that checks every `.dsl` edit, and diagram export.
+
+```
+/plugin marketplace add c4hero/c4hero
+/plugin install c4hero@c4hero
+```
+
+Requires Node.js 22+. Export also needs a Chromium-family browser. See [`plugins/c4hero/README.md`](plugins/c4hero/README.md) for the CLI and details.
+
 ## Browser support
 
 c4hero runs in any modern browser. **Folder collections** rely on the [File System Access API](https://developer.mozilla.org/en-US/docs/Web/API/File_System_Access_API), which is currently only available in Chromium browsers (Chrome, Edge, Brave, Arc, Opera).
@@ -89,6 +100,7 @@ This also opens the app in your browser automatically. If that folder was opened
 npm run dev          # dev server with HMR
 npm run build        # production bundle in dist/
 npm run preview      # serve the production bundle
+npm run build:plugin # rebuild the Claude Code plugin bundle in plugins/c4hero/
 npm run typecheck    # tsc -b
 npm run lint         # eslint
 npm test             # unit tests with Vitest
