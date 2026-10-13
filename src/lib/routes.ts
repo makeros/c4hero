@@ -7,3 +7,10 @@
 export function isCanvasRoute(pathname: string): boolean {
   return /\/collection\/[^/]+\/[^/]+/.test(pathname)
 }
+
+/** True when `pathname` is a standalone route that renders without canvas
+ *  chrome and must never be redirected away from on workspace load — e.g.
+ *  `/document-view`, opened in its own tab from a document link. */
+export function isStandaloneRoute(pathname: string): boolean {
+  return pathname === '/document-view'
+}

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { computeCascadeImpact, addToCurrentView, viewAllowsElementType } from './workspace-helpers'
-import type { Workspace } from '@/types/model'
+import { computeCascadeImpact, addToCurrentView, viewAllowsElementType, applyElementPatch } from './workspace-helpers'
+import type { Workspace, DocLink } from '@/types/model'
 
 function ws(): Workspace {
   return {
@@ -119,5 +119,45 @@ describe('view membership rules', () => {
     // A container view accepts the container.
     addToCurrentView(w, 'contA', 'c1', undefined, 'container')
     expect(w.views.containerViews[0].elements.some((e) => e.id === 'c1')).toBe(true)
+  })
+})
+
+describe('applyElementPatch — documents', () => {
+  const docA: DocLink = { path: 'docs/a.md', title: 'A' }
+  const docB: DocLink = { path: 'docs/b.md', title: 'B' }
+
+  it('sets documents on an element that has none', () => {
+    const w = ws()
+    const changed = applyElementPatch(w, 'p1', { documents: [docA] })
+    expect(changed).toBe(true)
+    const el = w.model.people.find((p) => p.id === 'p1')
+    expect(el?.documents).toEqual([docA])
+  })
+
+  it('changes an existing documents array to a different one', () => {
+    const w = ws()
+    applyElementPatch(w, 'p1', { documents: [docA] })
+    const changed = applyElementPatch(w, 'p1', { documents: [docB] })
+    expect(changed).toBe(true)
+    const el = w.model.people.find((p) => p.id === 'p1')
+    expect(el?.documents).toEqual([docB])
+  })
+
+  it('clears documents when passed undefined', () => {
+    const w = ws()
+    applyElementPatch(w, 'p1', { documents: [docA] })
+    const changed = applyElementPatch(w, 'p1', { documents: undefined })
+    expect(changed).toBe(true)
+    const el = w.model.people.find((p) => p.id === 'p1')
+    expect(el?.documents).toBeUndefined()
+  })
+
+  it('is a no-op when the patch has the same documents contents', () => {
+    const w = ws()
+    applyElementPatch(w, 'p1', { documents: [docA] })
+    const changed = applyElementPatch(w, 'p1', { documents: [{ ...docA }] })
+    expect(changed).toBe(false)
+    const el = w.model.people.find((p) => p.id === 'p1')
+    expect(el?.documents).toEqual([docA])
   })
 })

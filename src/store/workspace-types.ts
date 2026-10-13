@@ -142,9 +142,9 @@ export interface WorkspaceState extends UndoState {
   addSoftwareSystem: (name: string, position?: { x: number; y: number }, location?: 'Internal' | 'External') => string
   addContainer: (systemId: string, name: string, position?: { x: number; y: number }, extraTag?: string) => string
   addComponent: (containerId: string, name: string, position?: { x: number; y: number }) => string
-  updateElement: (id: string, patch: Partial<Pick<ModelElement, 'name' | 'description' | 'tags' | 'status' | 'owner' | 'url'>> & { location?: 'Internal' | 'External' | 'Unspecified' }) => void
+  updateElement: (id: string, patch: Partial<Pick<ModelElement, 'name' | 'description' | 'tags' | 'status' | 'owner' | 'url' | 'documents'>> & { location?: 'Internal' | 'External' | 'Unspecified' }) => void
   /** Same as updateElement but does NOT push an undo entry — for live typing previews */
-  updateElementLive: (id: string, patch: Partial<Pick<ModelElement, 'name' | 'description' | 'tags' | 'status' | 'owner' | 'url'>> & { location?: 'Internal' | 'External' | 'Unspecified', technology?: string }) => void
+  updateElementLive: (id: string, patch: Partial<Pick<ModelElement, 'name' | 'description' | 'tags' | 'status' | 'owner' | 'url' | 'documents'>> & { location?: 'Internal' | 'External' | 'Unspecified', technology?: string }) => void
   updateElementTechnology: (id: string, technology: string) => void
   deleteElement: (id: string) => void
   deleteElements: (ids: string[]) => void
@@ -157,7 +157,7 @@ export interface WorkspaceState extends UndoState {
 
   // Relationship CRUD
   addRelationship: (sourceId: string, destinationId: string, description?: string, technology?: string) => string
-  updateRelationship: (id: string, patch: Partial<Pick<Relationship, 'description' | 'technology' | 'interactionStyle' | 'lineStyle' | 'url' | 'tags' | 'properties'>>) => void
+  updateRelationship: (id: string, patch: Partial<Pick<Relationship, 'description' | 'technology' | 'interactionStyle' | 'lineStyle' | 'url' | 'tags' | 'properties' | 'documents'>>) => void
   reconnectRelationship: (id: string, newSourceId: string, newTargetId: string) => void
   deleteRelationship: (id: string) => void
 

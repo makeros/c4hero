@@ -9,6 +9,7 @@ import { normalizeSafeExternalUrl } from '@/lib/safeUrl'
 import { FieldLabel, EditableField, TechnologyField, OwnerField } from './right-panel/fields'
 import GroupProperties from './right-panel/GroupProperties'
 import DeploymentElementProperties from './right-panel/DeploymentElementProperties'
+import DocumentsTab from './right-panel/DocumentsTab'
 import { useAiProvider } from '@/store/ai-settings'
 import { suggestFieldValue, suggestTags } from '@/lib/ai'
 
@@ -441,6 +442,12 @@ function ElementProperties({ element, onClose }: { element: ModelElement; onClos
               )}
             </div>
 
+            {/* Documents */}
+            <div>
+              <FieldLabel>Documents</FieldLabel>
+              <DocumentsTab documents={element.documents ?? []} onUpdate={(documents) => updateElement(element.id, { documents })} />
+            </div>
+
             {/* Appears in views */}
             {appearsInViews.length > 0 && (
               <AppearsInViews views={appearsInViews} />
@@ -671,6 +678,10 @@ function RelationshipProperties({ relationship, onClose }: { relationship: Relat
               </a>
             )}
           </div>
+        </div>
+        <div>
+          <FieldLabel>Documents</FieldLabel>
+          <DocumentsTab documents={relationship.documents ?? []} onUpdate={(documents) => updateRelationship(relationship.id, { documents })} />
         </div>
         <div>
           <FieldLabel>Tags</FieldLabel>

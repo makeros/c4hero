@@ -116,6 +116,10 @@ export const createRelationshipSlice: StateCreator<
       const propsChanged = JSON.stringify(patch.properties) !== JSON.stringify(rel.properties)
       if (propsChanged) { rel.properties = patch.properties; changed = true }
     }
+    if ('documents' in patch) {
+      const documentsChanged = JSON.stringify(patch.documents) !== JSON.stringify(rel.documents)
+      if (documentsChanged) { rel.documents = patch.documents; changed = true }
+    }
     if (!changed) return
     pushUndoSnapshot(s)
   }),

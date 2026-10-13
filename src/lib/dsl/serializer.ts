@@ -19,7 +19,9 @@ import type {
     DeploymentEnvironment,
     DeploymentNode,
     InfrastructureNode,
+    DocLink,
 } from '@/types/model'
+import { documentsToProperties, withoutDocumentProperties } from './documentLinks'
 
 const INDENT = '    ' // 4 spaces
 const GROUP_SEPARATOR = '/'
@@ -373,15 +375,42 @@ class SerializerContext {
      * back to their fields. Derived keys are emitted first and deliberately
      * win over a colliding user property (the collision is only reachable by
      * hand-writing a reserved key next to the legacy bare keyword), so
-     * serialize → parse → serialize is byte-identical.
+     * serialize → parse → serialize is byte-identical. `documents` follows the
+     * same precedent but is indexed rather than scalar
+     * (`c4hero.documents.<n>.path`/`.title`), so it can't be one of
+     * `mergeDerivedProperties`'s scalar `[key, value]` pairs — its derived
+     * keys are layered on afterwards, also winning over any colliding user
+     * property.
+     *
+     * Before that layering, every existing `c4hero.documents.*` key is
+     * stripped from the merged properties (`withoutDocumentProperties`),
+     * regardless of index or completeness, and the whole namespace is
+     * re-derived fresh from `el.documents`. This matters for a hand-written
+     * DSL that leaves a non-hoisted "orphaned" entry behind — e.g.
+     * `c4hero.documents.1.path` with no matching `.1.title` (an incomplete
+     * entry `parseDocumentsFromProperties` correctly leaves in `rest`
+     * instead of hoisting), or `c4hero.documents.2.*` orphaned by a gap at
+     * index 1 (also left in `rest` per that function's documented
+     * stop-at-first-gap behavior). Once the user edits `documents` through
+     * the app (e.g. adds a new entry via the inspector), simply layering
+     * freshly derived keys on top of the merged properties — as this used to
+     * do — would either silently clobber an orphan whose index collides with
+     * a newly derived one, or leave a stale orphan at a now-filled gap index
+     * that silently re-hoists into a THIRD, never-added document on the next
+     * parse. Both are confirmed bugs (code review finding m2). Clearing the
+     * namespace first means an orphan present before such an edit is
+     * deliberately NOT preserved — this is simpler and more predictable than
+     * trying to merge/renumber stale indices alongside new ones, which would
+     * still surprise the user about where a renumbered entry came from.
      */
     private elementProperties(
-        el: { owner?: string; status?: string; properties: Record<string, string> },
+        el: { owner?: string; status?: string; properties: Record<string, string>; documents?: DocLink[] },
     ): Record<string, string> {
-        return this.mergeDerivedProperties(
+        const props = this.mergeDerivedProperties(
             [['owner', el.owner], ['c4hero.status', el.status]],
             el.properties,
         )
+        return { ...withoutDocumentProperties(props), ...documentsToProperties(el.documents) }
     }
 
     /**
@@ -389,13 +418,15 @@ class SerializerContext {
      * are not Structurizr keywords in a relationship body (the real parser
      * rejects them), so they travel as `c4hero.lineStyle` /
      * `c4hero.interactionStyle` properties, with the same derived-first,
-     * derived-wins rules as elementProperties().
+     * derived-wins rules as elementProperties() — including the whole-
+     * namespace `c4hero.documents.*` clear-and-replace described there.
      */
     private relationshipProperties(rel: Relationship): Record<string, string> {
-        return this.mergeDerivedProperties(
+        const props = this.mergeDerivedProperties(
             [['c4hero.lineStyle', rel.lineStyle], ['c4hero.interactionStyle', rel.interactionStyle]],
             rel.properties,
         )
+        return { ...withoutDocumentProperties(props), ...documentsToProperties(rel.documents) }
     }
 
     /**

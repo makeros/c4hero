@@ -1,10 +1,11 @@
 import { defineConfig } from 'vitest/config'
+import { createServer } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 import path from 'path'
 import { execSync } from 'child_process'
-import { readFileSync } from 'fs'
+import { readFileSync, existsSync, statSync, readdirSync, mkdirSync, copyFileSync, realpathSync } from 'fs'
 
 const commitHash = execSync('git rev-parse --short HEAD').toString().trim()
 const appVersion = JSON.parse(readFileSync(path.resolve(__dirname, 'package.json'), 'utf8')).version
@@ -16,6 +17,84 @@ const appVersion = JSON.parse(readFileSync(path.resolve(__dirname, 'package.json
 // for how the env var gets set.
 const LOCKED_WORKSPACE_VIRTUAL_ID = 'virtual:locked-workspace'
 const LOCKED_WORKSPACE_RESOLVED_ID = '\0' + LOCKED_WORKSPACE_VIRTUAL_ID
+
+// Fixed mount point every environment fetches a `documents[].path` link's raw
+// markdown from (see specifications/document-links/document-links.plan.md's
+// "File resolution — one URL shape, three environments"). Dev and the prod
+// build are covered by the `document-links` plugin below; the locked viewer
+// build (`npm run build:viewer`) is a separate script/plugin pairing.
+const DOCS_MOUNT_PREFIX = '/__docs/'
+
+// This feature's scope is local markdown files only (see the plan's Goal) —
+// never serve `.env`, `.git/**`, or any other arbitrary repo file over HTTP
+// just because it happens to live under the project root. Kept in lockstep
+// with `planDocumentCopies` (src/lib/documentCollection.ts), which applies
+// the identical restriction at build time.
+const MARKDOWN_EXTENSIONS = ['.md', '.markdown']
+
+function hasMarkdownExtension(docPath: string): boolean {
+  const lower = docPath.toLowerCase()
+  return MARKDOWN_EXTENSIONS.some((ext) => lower.endsWith(ext))
+}
+
+// Rejects any path with a segment starting with `.` — blocks dotfiles/dirs
+// (`.env`, `.git/config`, …) even nested, and as a side effect also rejects
+// any `..` segment outright ahead of the resolve()-based containment check
+// below.
+function hasHiddenSegment(docPath: string): boolean {
+  return docPath.split(/[\\/]/).some((segment) => segment.startsWith('.'))
+}
+
+// Resolves a `/__docs/<encoded-path>` request's encoded remainder to an
+// absolute path, decoding it as a single percent-encoded segment (so an
+// encoded `/` round-trips back to a real subdirectory separator) and
+// reporting whether the result should be rejected — either because it fails
+// the markdown-extension/hidden-segment allowlist, or because it normalizes
+// outside `projectRoot` — the same containment check `planDocumentCopies`
+// (src/lib/documentCollection.ts) applies at build time, kept in lockstep
+// here for the dev-time request path. This only covers the TEXTUAL check;
+// the caller still has to re-check the REAL (symlink-resolved) path once the
+// candidate file is confirmed to exist — see the `configureServer` handler
+// below.
+function resolveDocPath(
+  encodedPath: string,
+  projectRoot: string,
+): { absolute: string; rejected: boolean } {
+  const decoded = decodeURIComponent(encodedPath)
+  const absolute = path.resolve(projectRoot, decoded)
+  if (!hasMarkdownExtension(decoded) || hasHiddenSegment(decoded)) {
+    return { absolute, rejected: true }
+  }
+  const rel = path.relative(projectRoot, absolute)
+  const escapesRoot = rel === '' ? false : rel.startsWith('..') || path.isAbsolute(rel)
+  return { absolute, rejected: escapesRoot }
+}
+
+// Re-checks containment against the REAL (symlink-resolved) path. Node's
+// existsSync/statSync/readFileSync all follow symlinks, so a file that is
+// textually inside `projectRoot` but is actually a symlink pointing outside
+// it would otherwise be served anyway. Resolves `projectRoot` fresh too, in
+// case the root itself involves a symlink.
+function isRealPathContained(absolute: string, projectRoot: string): boolean {
+  try {
+    const realAbsolute = realpathSync(absolute)
+    const realRoot = realpathSync(projectRoot)
+    const rel = path.relative(realRoot, realAbsolute)
+    return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel))
+  } catch {
+    return false
+  }
+}
+
+// `closeBundle` runs after `tsc -b`'s separate pass, inside the already-
+// bundled `vite.config.ts` module — which means a plain `import` of
+// `src/lib/documentCollection.ts` here can't resolve its own `@/*` aliases or
+// extensionless `./dsl` import (Vite's config loader bundles this file with
+// plain Node module resolution, not the app's `resolve.alias`/bundler-mode
+// resolution). A short-lived, middleware-mode Vite dev server gives us that
+// same alias/extension resolution to `ssrLoadModule` the real
+// `planDocumentCopies` instead of reimplementing its DSL-parsing logic here.
+let resolvedOutDir = 'dist'
 
 export default defineConfig({
   plugins: [
@@ -53,6 +132,95 @@ export default defineConfig({
         const sidecar = sidecarPath ? readFileSync(sidecarPath, 'utf8') : null
         const name = path.basename(workspacePath).replace(/\.dsl$/i, '')
         return `export default ${JSON.stringify({ dsl, sidecar, name })}`
+      },
+    },
+    {
+      name: 'document-links',
+      configResolved(config) {
+        resolvedOutDir = config.build.outDir
+      },
+      configureServer(server) {
+        server.middlewares.use((req, res, next) => {
+          if (!req.url || !req.url.startsWith(DOCS_MOUNT_PREFIX)) return next()
+
+          const encodedPath = req.url.slice(DOCS_MOUNT_PREFIX.length).split('?')[0]
+
+          let absolute: string
+          let rejected: boolean
+          try {
+            ;({ absolute, rejected } = resolveDocPath(encodedPath, __dirname))
+          } catch {
+            res.statusCode = 400
+            res.end('Bad request')
+            return
+          }
+
+          if (rejected) {
+            res.statusCode = 400
+            res.end('Bad request')
+            return
+          }
+
+          if (!existsSync(absolute) || !statSync(absolute).isFile()) {
+            res.statusCode = 404
+            res.end('Not found')
+            return
+          }
+
+          if (!isRealPathContained(absolute, __dirname)) {
+            res.statusCode = 400
+            res.end('Bad request')
+            return
+          }
+
+          res.statusCode = 200
+          res.setHeader('Content-Type', 'text/markdown; charset=utf-8')
+          res.end(readFileSync(absolute))
+        })
+      },
+      async closeBundle() {
+        // Optional: only set when `scripts/build-app.mjs` was invoked with
+        // `--workspace <dir>` — the bare `npm run build` every current
+        // deploy (Vercel, CI) runs leaves this unset, so collection is
+        // skipped entirely with no warning, matching today's build exactly.
+        const workspaceDir = process.env.DOCUMENT_WORKSPACE_DIR
+        if (!workspaceDir) return
+
+        const dslFilePaths = readdirSync(workspaceDir)
+          .filter((name) => name.toLowerCase().endsWith('.dsl'))
+          .map((name) => path.join(workspaceDir, name))
+
+        const server = await createServer({
+          configFile: false,
+          root: __dirname,
+          resolve: { alias: { '@': path.resolve(__dirname, 'src') } },
+          server: { middlewareMode: true, hmr: false },
+          optimizeDeps: { noDiscovery: true },
+          logLevel: 'error',
+        })
+
+        let plan: { copies: Array<{ from: string; to: string }>; missing: string[] }
+        try {
+          const { planDocumentCopies } = await server.ssrLoadModule('/src/lib/documentCollection.ts')
+          plan = planDocumentCopies(dslFilePaths, __dirname)
+        } finally {
+          await server.close()
+        }
+
+        const outDirAbsolute = path.resolve(__dirname, resolvedOutDir)
+        for (const { from, to } of plan.copies) {
+          const dest = path.join(outDirAbsolute, to)
+          mkdirSync(path.dirname(dest), { recursive: true })
+          copyFileSync(from, dest)
+        }
+        for (const missingPath of plan.missing) {
+          // Intentional: this is the plan's own Definition of Done ("logs a
+          // console.warn per missing file") for Task 3.2.
+          // eslint-disable-next-line no-console
+          console.warn(
+            `[document-links] referenced document not found (or resolves outside the project root), skipped: ${missingPath}`,
+          )
+        }
       },
     },
     VitePWA({

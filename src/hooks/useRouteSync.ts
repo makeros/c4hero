@@ -6,6 +6,7 @@ import { loadFromLocalStorage } from '@/lib/fileIO'
 import { createLogger } from '@/lib/logger'
 import { parseWorkspaceDocument } from '@/lib/workspaceDocument'
 import { getLockedWorkspace } from '@/lib/lockedWorkspace'
+import { isStandaloneRoute } from '@/lib/routes'
 
 const log = createLogger('routeSync')
 
@@ -52,6 +53,10 @@ export function useRouteSync() {
   // Sync state → URL when view changes
   useEffect(() => {
     if (!workspace) return
+    // Standalone routes (e.g. /document-view) render without canvas chrome
+    // and must never be pulled back to a canvas URL just because a workspace
+    // happens to be loaded (e.g. the locked viewer's auto-load effect).
+    if (isStandaloneRoute(location.pathname)) return
     const targetPath = buildCanvasPath(activeViewKey)
     if (location.pathname !== targetPath) {
       if (isInitialSync.current) {

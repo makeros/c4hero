@@ -23,12 +23,13 @@ import ErrorBoundary from '@/components/shared/ErrorBoundary'
 import NotFound from '@/components/shared/NotFound'
 import { loadFromLocalStorage } from '@/lib/fileIO'
 import { restoreDirHandle, getCurrentDirHandle } from '@/lib/folderIO'
-import { isCanvasRoute } from '@/lib/routes'
+import { isCanvasRoute, isStandaloneRoute } from '@/lib/routes'
 import { getLockedWorkspace } from '@/lib/lockedWorkspace'
 
 const SearchDialog = lazy(() => import('@/components/search/SearchDialog'))
 const WelcomeScreen = lazy(() => import('@/components/welcome/WelcomeScreen'))
 const AiPanel = lazy(() => import('@/components/ai/AiPanel'))
+const DocumentView = lazy(() => import('@/components/views/DocumentView'))
 
 export default function App() {
   const workspace = useWorkspaceStore((s) => s.workspace)
@@ -77,9 +78,12 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-    // When workspace loads while not on a canvas route, navigate there
+    // When workspace loads while not on a canvas route, navigate there —
+  // except on a standalone route (e.g. /document-view, opened in its own tab
+  // from a document link), which must render as-is even when the locked
+  // viewer's auto-load effect just populated the workspace.
   useEffect(() => {
-    if (workspace && !isCanvasRoute(location.pathname)) {
+    if (workspace && !isCanvasRoute(location.pathname) && !isStandaloneRoute(location.pathname)) {
       const slug = getCurrentDirHandle()?.name ?? 'workspace'
       const wsFilename = useWorkspaceStore.getState().activeWorkspaceFilename ?? 'workspace'
       const wsSlug = wsFilename.replace(/\.dsl$/, '')
@@ -163,6 +167,14 @@ export default function App() {
             syntax didn't reliably match when the optional segment was absent. */}
         <Route path="/collection/:collectionSlug/:workspaceSlug" element={canvasElement} />
         <Route path="/collection/:collectionSlug/:workspaceSlug/:viewKey" element={canvasElement} />
+
+        {/* Standalone document-link viewer — opened in a new tab from a
+            document link's open-link button, never wrapped in canvas chrome. */}
+        <Route path="/document-view" element={
+          <Suspense fallback={<LoadingDot />}>
+            <DocumentView />
+          </Suspense>
+        } />
 
         {/* Fallback — friendly 404 */}
         <Route path="*" element={<NotFound />} />

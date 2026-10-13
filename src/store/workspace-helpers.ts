@@ -100,7 +100,7 @@ export function invalidateElementIndex(ws: Workspace): void {
 }
 
 /** Patch shape that updateElement / updateElementLive both consume. */
-export type ElementPatch = Partial<Pick<ModelElement, 'name' | 'description' | 'tags' | 'status' | 'owner' | 'url'>>
+export type ElementPatch = Partial<Pick<ModelElement, 'name' | 'description' | 'tags' | 'status' | 'owner' | 'url' | 'documents'>>
   & { location?: 'Internal' | 'External' | 'Unspecified'; technology?: string }
 
 /** Apply a patch to an element in-place. Returns true only when the
@@ -123,6 +123,10 @@ export function applyElementPatch(ws: Workspace, id: string, patch: ElementPatch
     if ('status' in patch && el.status !== patch.status) { el.status = patch.status; changed = true }
     if ('owner' in patch && el.owner !== patch.owner) { el.owner = patch.owner; changed = true }
     if ('url' in patch && el.url !== patch.url) { el.url = patch.url; changed = true }
+    if ('documents' in patch && JSON.stringify(patch.documents) !== JSON.stringify(el.documents)) {
+      el.documents = patch.documents
+      changed = true
+    }
     if (patch.location !== undefined && (el.type === 'person' || el.type === 'softwareSystem')) {
       const cur = (el as Person | SoftwareSystem).location
       if (cur !== patch.location) { (el as Person | SoftwareSystem).location = patch.location; changed = true }
