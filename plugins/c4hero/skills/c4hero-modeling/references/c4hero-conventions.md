@@ -43,6 +43,8 @@ Document links are indexed from 0 with no gaps, and each needs both `.path` and 
 - `link-doc --create` scaffolds the file from the model and never overwrites. Replace the scaffold with real prose afterwards; the generated "Relationships" list is derived from the model and goes stale.
 - Put docs in a stable folder (for example `docs/architecture/`) and one file per element; reuse one file for several elements only when they truly share the topic.
 
+**Links inside documents.** The viewer follows relative markdown links (`[x](other.md#heading)`), inline-code mentions of a `.md` path, and Obsidian wikilinks (`[[Name]]`, `[[Name|alias]]`, `[[Name#Heading]]`, `[[#Heading]]`, `![[Name]]` as a plain link). Wikilinks resolve by name, not path: first relative to the current document's folder, then from the project root, then any file with that name (same folder, then fewest path segments, then alphabetical). A target that exists nowhere is shown dimmed and opens "Document not found". Builds with `--workspace` (`npm run build`, `build:viewer`) copy every document the model links to plus, transitively, every document those link to, and write `__docs/__index.json` listing them; unresolved links are warnings, not failures.
+
 ## Sidecar `<name>.c4hero.json`
 
 Sits next to the `.dsl`, named after it. Holds only what the DSL cannot: per-view layout lock, and pinned or locked element positions (`{ "version": 1, "views": { "<viewKey>": { "locked": true, "elements": { "<id>": { "pinned": true, "x": 0, "y": 0 } } } } }`). It is absent when there is nothing to store. Older sidecars may carry `status`, `owner` and `lineStyle` entries; they are read for migration and no longer written.

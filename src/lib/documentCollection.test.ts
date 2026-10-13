@@ -1,8 +1,8 @@
 import { describe, it, expect, afterEach } from 'vitest'
-import { mkdtempSync, writeFileSync, mkdirSync, rmSync, symlinkSync } from 'node:fs'
+import { mkdtempSync, writeFileSync, mkdirSync, rmSync, symlinkSync, readFileSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { findReferencedDocumentPaths, planDocumentCopies } from './documentCollection'
+import { findReferencedDocumentPaths, planDocumentCopies, writeDocumentCopies } from './documentCollection'
 import { serializeDSL } from './dsl'
 import { docsRootFor } from './docPath'
 import type { Workspace, DocLink } from '@/types/model'
@@ -277,5 +277,95 @@ describe('planDocumentCopies', () => {
         const plan = planDocumentCopies([file], dir)
         expect(plan.copies).toEqual([])
         expect(plan.missing).toEqual(['.git/config.md'])
+    })
+})
+
+describe('transitive document collection', () => {
+    let dir: string
+    let out: string
+
+    afterEach(() => {
+        if (dir) rmSync(dir, { recursive: true, force: true })
+        if (out) rmSync(out, { recursive: true, force: true })
+    })
+
+    function setup(files: Record<string, string>, rootDoc = 'docs/a.md'): string {
+        dir = mkdtempSync(join(tmpdir(), 'c4hero-doc-crawl-'))
+        for (const [rel, body] of Object.entries(files)) {
+            mkdirSync(join(dir, rel, '..'), { recursive: true })
+            writeFileSync(join(dir, rel), body, 'utf8')
+        }
+        const dsl = join(dir, 'workspace.dsl')
+        writeFileSync(dsl, serializeDSL(ws({
+            people: [{ id: 'p1', type: 'person', name: 'P', tags: [], properties: {}, documents: [{ path: rootDoc, title: 'A' }] }],
+        })), 'utf8')
+        return dsl
+    }
+
+    it('follows links, mentions and wikilinks transitively and lists exactly the copied docs in the index', () => {
+        const dsl = setup({
+            'docs/a.md': '# A\n\nSee [[B]] and [[Missing note]] and [[B\\|again]].',
+            'docs/sub/B.md': 'B mentions `c.md` and ![[#top]]',
+            'docs/sub/c.md': '[d](../d.md#x) and [e](https://example.com/e.md)',
+            'docs/d.md': '# D',
+            'docs/unlinked.md': 'nobody links here',
+        })
+        const plan = planDocumentCopies([dsl], dir)
+
+        expect(plan.copies.map((c) => c.to)).toEqual([
+            '__docs/docs/a.md',
+            '__docs/docs/sub/B.md',
+            '__docs/docs/sub/c.md',
+            '__docs/docs/d.md',
+        ])
+        expect(plan.missing).toEqual(['docs/Missing note.md'])
+        expect(plan.warnings).toEqual([])
+
+        out = mkdtempSync(join(tmpdir(), 'c4hero-doc-out-'))
+        writeDocumentCopies(plan, out)
+        expect(existsSync(join(out, '__docs/docs/sub/c.md'))).toBe(true)
+        expect(existsSync(join(out, '__docs/docs/unlinked.md'))).toBe(false)
+        expect(JSON.parse(readFileSync(join(out, '__docs/__index.json'), 'utf8'))).toEqual({
+            files: ['docs/a.md', 'docs/d.md', 'docs/sub/B.md', 'docs/sub/c.md'],
+        })
+    })
+
+    it('ignores links in fenced and inline code, and survives cycles', () => {
+        const dsl = setup({
+            'docs/a.md': '```\n[x](hidden.md) [[Hidden]]\n```\n`[[AlsoHidden]]` [back](b.md)',
+            'docs/b.md': '[a](a.md)',
+            'docs/hidden.md': '',
+            'docs/Hidden.md': '',
+        })
+        const plan = planDocumentCopies([dsl], dir)
+        expect(plan.copies.map((c) => c.to)).toEqual(['__docs/docs/a.md', '__docs/docs/b.md'])
+        expect(plan.missing).toEqual([])
+    })
+
+    it('applies the allowlist to linked docs: escapes, hidden segments and non-markdown are missing', () => {
+        const outside = mkdtempSync(join(tmpdir(), 'c4hero-doc-outside-'))
+        writeFileSync(join(outside, 'secret.md'), 'secret', 'utf8')
+        try {
+            const dsl = setup({
+                'docs/a.md': '[up](../../secret.md) [h](.hidden/h.md) [t](t.txt) [l](link.md)',
+                '.hidden/h.md': 'h',
+            })
+            symlinkSync(join(outside, 'secret.md'), join(dir, 'docs', 'link.md'))
+            const plan = planDocumentCopies([dsl], dir)
+            expect(plan.copies.map((c) => c.to)).toEqual(['__docs/docs/a.md'])
+            expect(plan.missing).toEqual(expect.arrayContaining(['../secret.md', 'docs/link.md']))
+            expect(plan.missing).not.toContain('docs/t.txt')
+        } finally {
+            rmSync(outside, { recursive: true, force: true })
+        }
+    })
+
+    it('caps the crawl and warns', () => {
+        const files: Record<string, string> = { 'docs/a.md': '[n](n0.md)' }
+        for (let i = 0; i < 2005; i++) files[`docs/n${i}.md`] = `[n](n${i + 1}.md)`
+        const dsl = setup(files)
+        const plan = planDocumentCopies([dsl], dir)
+        expect(plan.copies).toHaveLength(2000)
+        expect(plan.warnings).toHaveLength(1)
     })
 })

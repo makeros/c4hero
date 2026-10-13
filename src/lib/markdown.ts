@@ -8,13 +8,47 @@
 import DOMPurify from 'dompurify'
 import { marked } from 'marked'
 
-import { HEADING_ID_PREFIX, type DocLink, createSlugger, docBasename, resolveDocLink } from './docLinks'
+import {
+  CODE_DOC_PATH,
+  HEADING_ID_PREFIX,
+  type DocLink,
+  createSlugger,
+  docBasename,
+  parseWikilink,
+  resolveDocLink,
+  resolveWikilink,
+} from './docLinks'
 
 type DocTarget = Extract<DocLink, { kind: 'doc' }>
 
-// A path ending in .md/.markdown with an optional #fragment; no backticks,
-// angle brackets or line breaks.
-const CODE_DOC_PATH = /^[^`<>\r\n#]+\.(md|markdown)(#[^`<>\r\n]*)?$/i
+const escapeHtml = (text: string): string =>
+  text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+
+// Obsidian-style `[[target#heading|alias]]` / `![[target]]` (embeds render as a
+// plain link). Emits `<a data-wikilink="raw">`; `data-*` survives DOMPurify, and
+// the href is only filled in by the DOMParser pass below.
+marked.use({
+  extensions: [
+    {
+      name: 'wikilink',
+      level: 'inline',
+      start: (src: string) => src.search(/!?\[\[/),
+      tokenizer(src: string) {
+        const match = /^!?\[\[([^[\]\n]+?)\]\]/.exec(src)
+        if (!match) return undefined
+        return { type: 'wikilink', raw: match[0], inner: match[1] }
+      },
+      renderer(token) {
+        const inner = (token as unknown as { inner: string }).inner
+        const { target, heading, alias } = parseWikilink(inner)
+        const name = docBasename(target).replace(/\.(md|markdown)$/i, '')
+        const text = alias || (target && heading ? `${name} > ${heading}` : name || heading)
+        const raw = heading ? `${target}#${heading}` : target
+        return `<a data-wikilink="${escapeHtml(raw)}">${escapeHtml(text)}</a>`
+      },
+    },
+  ],
+})
 
 function docViewHref(link: DocTarget, title: string): string {
   const query = new URLSearchParams({ path: link.path, title }).toString()
@@ -25,7 +59,12 @@ function docViewHref(link: DocTarget, title: string): string {
 // ids clashing with DOM properties) and carry HEADING_ID_PREFIX for the same
 // reason. Link rewriting happens only when `docPath` (the current document's
 // project-root-relative path) is given.
-export function renderMarkdownToSafeHtml(markdown: string, options?: { docPath: string }): string {
+// `index` is the project's markdown file list (null when unavailable) used to
+// resolve wikilinks by name.
+export function renderMarkdownToSafeHtml(
+  markdown: string,
+  options?: { docPath: string; index?: string[] | null },
+): string {
   const html = marked.parse(markdown, { async: false })
   const doc = new DOMParser().parseFromString(DOMPurify.sanitize(html), 'text/html')
 
@@ -45,6 +84,21 @@ export function renderMarkdownToSafeHtml(markdown: string, options?: { docPath: 
         a.setAttribute('href', `#${HEADING_ID_PREFIX}${encodeURIComponent(link.fragment)}`)
       } else if (link.kind === 'doc') {
         a.setAttribute('href', docViewHref(link, a.textContent?.trim() || docBasename(link.path)))
+      }
+    })
+
+    doc.querySelectorAll('a[data-wikilink]').forEach((a) => {
+      const raw = a.getAttribute('data-wikilink') ?? ''
+      const text = a.textContent?.trim() ?? ''
+      const link = resolveWikilink(options.docPath, raw, options.index ?? null)
+      if (link.kind === 'anchor') {
+        a.setAttribute('href', `#${HEADING_ID_PREFIX}${encodeURIComponent(link.fragment)}`)
+      } else if (link.kind === 'doc') {
+        a.setAttribute('href', docViewHref(link, text || docBasename(link.path)))
+      } else {
+        a.setAttribute('href', docViewHref({ kind: 'doc', path: link.path, fragment: '' }, text || link.target))
+        a.classList.add('doc-link-unresolved')
+        a.setAttribute('title', `Not found: ${link.target}`)
       }
     })
 

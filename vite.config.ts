@@ -5,8 +5,8 @@ import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 import path from 'path'
 import { execSync } from 'child_process'
-import { docsRootFor, isInsideRootReal, resolveDocRequest } from './src/lib/docPath.ts'
-import { readFileSync, existsSync, statSync, readdirSync, mkdirSync, copyFileSync } from 'fs'
+import { docsRootFor, isInsideRootReal, listMarkdownFiles, resolveDocRequest } from './src/lib/docPath.ts'
+import { readFileSync, existsSync, statSync, readdirSync } from 'fs'
 
 // Set by scripts/build-plugin.mjs: builds the headless export viewer into
 // plugins/c4hero/viewer/ (relative base, no PWA, no document collection, a
@@ -30,6 +30,7 @@ const LOCKED_WORKSPACE_RESOLVED_ID = '\0' + LOCKED_WORKSPACE_VIRTUAL_ID
 // build are covered by the `document-links` plugin below; the locked viewer
 // build (`npm run build:viewer`) is a separate script/plugin pairing.
 const DOCS_MOUNT_PREFIX = '/__docs/'
+const DOCS_INDEX_NAME = '__index.json'
 
 // `closeBundle` runs after `tsc -b`'s separate pass, inside the already-
 // bundled `vite.config.ts` module — which means a plain `import` of
@@ -94,6 +95,15 @@ export default defineConfig({
 
           const encodedPath = req.url.slice(DOCS_MOUNT_PREFIX.length).split('?')[0]
 
+          // Markdown file list for wikilink resolution. Can't collide with a
+          // document: those must end in .md/.markdown.
+          if (encodedPath === DOCS_INDEX_NAME) {
+            res.statusCode = 200
+            res.setHeader('Content-Type', 'application/json; charset=utf-8')
+            res.end(JSON.stringify(listMarkdownFiles(docsRoot)))
+            return
+          }
+
           let absolute: string
           let rejected: boolean
           try {
@@ -148,20 +158,17 @@ export default defineConfig({
           logLevel: 'error',
         })
 
-        let plan: { copies: Array<{ from: string; to: string }>; missing: string[] }
+        let plan: { copies: Array<{ from: string; to: string }>; missing: string[]; warnings: string[] }
+        let writeDocumentCopies: (plan: { copies: Array<{ from: string; to: string }> }, outDir: string) => void
         try {
-          const { planDocumentCopies } = await server.ssrLoadModule('/src/lib/documentCollection.ts')
-          plan = planDocumentCopies(dslFilePaths, docsRootFor(workspaceDir))
+          const collection = await server.ssrLoadModule('/src/lib/documentCollection.ts')
+          writeDocumentCopies = collection.writeDocumentCopies
+          plan = collection.planDocumentCopies(dslFilePaths, docsRootFor(workspaceDir))
         } finally {
           await server.close()
         }
 
-        const outDirAbsolute = path.resolve(__dirname, resolvedOutDir)
-        for (const { from, to } of plan.copies) {
-          const dest = path.join(outDirAbsolute, to)
-          mkdirSync(path.dirname(dest), { recursive: true })
-          copyFileSync(from, dest)
-        }
+        writeDocumentCopies(plan, path.resolve(__dirname, resolvedOutDir))
         for (const missingPath of plan.missing) {
           // Intentional: this is the plan's own Definition of Done ("logs a
           // console.warn per missing file") for Task 3.2.
@@ -169,6 +176,10 @@ export default defineConfig({
           console.warn(
             `[document-links] referenced document not found (or resolves outside the project root), skipped: ${missingPath}`,
           )
+        }
+        for (const warning of plan.warnings) {
+          // eslint-disable-next-line no-console
+          console.warn(`[document-links] ${warning}`)
         }
       },
     } satisfies Plugin]),

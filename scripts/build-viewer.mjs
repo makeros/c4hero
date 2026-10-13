@@ -11,7 +11,7 @@
 // Usage: npm run build:viewer -- --workspace /path/to/workspace.dsl
 
 import { spawn } from 'node:child_process'
-import { existsSync, statSync, mkdirSync, copyFileSync } from 'node:fs'
+import { existsSync, statSync } from 'node:fs'
 import path from 'node:path'
 import { createServer } from 'vite'
 import { sidecarName } from '../src/lib/sidecarName.ts'
@@ -78,7 +78,7 @@ const viteBin = path.join(
   process.platform === 'win32' ? 'vite.cmd' : 'vite'
 )
 
-// Collects this workspace's `documents[].path` references (via the shared
+// Collects this workspace's `documents[].path` references and the documents they link to (via the shared
 // src/lib/documentCollection.ts, the same module Task 3.2 uses for the main
 // build) and copies each one into dist-viewer/__docs/<path>. Loaded through a
 // middleware-mode Vite dev server (ssrLoadModule) rather than a plain Node
@@ -103,9 +103,11 @@ async function copyReferencedDocuments(workspacePath, root) {
   })
 
   let plan
+  let writeDocumentCopies
   try {
-    const { planDocumentCopies } = await server.ssrLoadModule('/src/lib/documentCollection.ts')
-    plan = planDocumentCopies([workspacePath], docsRoot)
+    const collection = await server.ssrLoadModule('/src/lib/documentCollection.ts')
+    writeDocumentCopies = collection.writeDocumentCopies
+    plan = collection.planDocumentCopies([workspacePath], docsRoot)
   } finally {
     await server.close()
   }
@@ -113,13 +115,9 @@ async function copyReferencedDocuments(workspacePath, root) {
   for (const missingPath of plan.missing) {
     console.warn(`[build:viewer] referenced document not found, skipping: ${missingPath}`)
   }
+  for (const warning of plan.warnings) console.warn(`[build:viewer] ${warning}`)
 
-  const outDir = path.join(root, 'dist-viewer')
-  for (const { from, to } of plan.copies) {
-    const dest = path.join(outDir, to)
-    mkdirSync(path.dirname(dest), { recursive: true })
-    copyFileSync(from, dest)
-  }
+  writeDocumentCopies(plan, path.join(root, 'dist-viewer'))
 }
 
 const vite = spawn(viteBin, ['build', '--outDir', 'dist-viewer', ...args], {

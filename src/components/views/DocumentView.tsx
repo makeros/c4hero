@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { FileWarning, FileX } from 'lucide-react'
 import { renderMarkdownToSafeHtml } from '@/lib/markdown'
 import { HEADING_ID_PREFIX } from '@/lib/docLinks'
+import { fetchDocIndex } from '@/lib/docIndex'
 
 // Standalone page for a document link's target — opened in a new tab via
 // `/document-view?path=<project-root-relative .md path>&title=<label>`
@@ -86,6 +87,8 @@ export default function DocumentView() {
         return
       }
       try {
+        const index = await fetchDocIndex()
+        if (cancelled) return
         const res = await fetch(`/__docs/${encodeURI(docPath)}`)
         if (cancelled) return
         if (res.status === 404) {
@@ -98,7 +101,7 @@ export default function DocumentView() {
         }
         const markdown = await res.text()
         if (cancelled) return
-        setState({ status: 'loaded', path: docPath, html: renderMarkdownToSafeHtml(markdown, { docPath }) })
+        setState({ status: 'loaded', path: docPath, html: renderMarkdownToSafeHtml(markdown, { docPath, index }) })
       } catch {
         if (!cancelled) setState({ status: 'error', path: docPath })
       }
@@ -212,6 +215,10 @@ export default function DocumentView() {
         .document-view-content p { margin: 0.8em 0; }
         .document-view-content a { color: var(--color-accent); }
         .document-view-content a code { color: var(--color-accent); }
+        .document-view-content a.doc-link-unresolved {
+          color: var(--color-text-muted);
+          text-decoration: underline dashed;
+        }
         .document-view-content a.doc-code-link { text-decoration: none; }
         .document-view-content a.doc-code-link:hover code { text-decoration: underline; }
         .document-view-content code {

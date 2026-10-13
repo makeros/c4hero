@@ -2,7 +2,7 @@
 // markdown files inside the project root only. Dependency-free on purpose
 // (node:path / node:fs only) so Vite config, the CLI and the app build share
 // one implementation.
-import { existsSync, realpathSync, statSync } from 'node:fs'
+import { existsSync, readdirSync, realpathSync, statSync } from 'node:fs'
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
 
 const MARKDOWN_EXTENSIONS = ['.md', '.markdown']
@@ -78,4 +78,54 @@ export function resolveDocRequest(
   const absolute = resolve(root, decoded)
   const rejected = !hasMarkdownExtension(decoded) || hasHiddenSegment(decoded) || !isInsideRoot(root, absolute)
   return { absolute, rejected }
+}
+
+/** Root-relative POSIX paths of every markdown file under `root` (names sorted per folder).
+ *  Skips hidden segments and `node_modules`, never follows directory symlinks,
+ *  and drops file symlinks whose target lies outside `root`. Stops at `limit`
+ *  entries (`truncated: true`). */
+export function listMarkdownFiles(
+  root: string,
+  { limit = 10_000 }: { limit?: number } = {},
+): { files: string[]; truncated: boolean } {
+  const files: string[] = []
+  let truncated = false
+  let realRoot: string
+  try {
+    realRoot = realpathSync(root)
+  } catch {
+    return { files, truncated }
+  }
+
+  const walk = (dir: string, prefix: string): void => {
+    let entries
+    try {
+      entries = readdirSync(dir, { withFileTypes: true })
+    } catch {
+      return
+    }
+    entries.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))
+    for (const entry of entries) {
+      if (truncated) return
+      if (entry.name.startsWith('.') || entry.name === 'node_modules') continue
+      const abs = join(dir, entry.name)
+      const rel = prefix + entry.name
+      if (entry.isDirectory()) {
+        walk(abs, rel + '/')
+      } else if (hasMarkdownExtension(entry.name) && (entry.isFile() || entry.isSymbolicLink())) {
+        try {
+          if (!statSync(abs).isFile() || !isInsideRoot(realRoot, realpathSync(abs))) continue
+        } catch {
+          continue
+        }
+        if (files.length >= limit) {
+          truncated = true
+          return
+        }
+        files.push(rel)
+      }
+    }
+  }
+  walk(resolve(root), '')
+  return { files, truncated }
 }

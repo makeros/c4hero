@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, useLocation } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import DocumentView from './DocumentView'
+import { resetDocIndexCache } from '@/lib/docIndex'
 
 // Real routing (the global setup mocks useNavigate/useLocation).
 vi.mock('react-router-dom', async (importOriginal) => importOriginal())
@@ -14,7 +15,10 @@ function stubFetch(impl: () => unknown) {
   vi.stubGlobal('fetch', vi.fn(impl))
 }
 
-afterEach(() => vi.unstubAllGlobals())
+afterEach(() => {
+  vi.unstubAllGlobals()
+  resetDocIndexCache()
+})
 
 describe('DocumentView', () => {
   it('fetches the document and renders its markdown as HTML', async () => {
@@ -105,6 +109,28 @@ describe('DocumentView', () => {
       const ext = screen.getByRole('link', { name: 'ext' })
       expect(ext.getAttribute('target')).toBe('_blank')
       expect(ext.getAttribute('rel')).toBe('noopener noreferrer')
+    })
+
+    it('resolves wikilinks against the fetched index and dims unresolved ones', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async (url: string) =>
+          url === '/__docs/__index.json'
+            ? res({ ok: true, status: 200, text: async () => JSON.stringify({ files: ['docs/a.md', 'std/Cloud.md'] }) })
+            : res({ ok: true, status: 200, text: async () => 'See [[Cloud]] and [[Nope]].' }),
+        ),
+      )
+      render(
+        <MemoryRouter initialEntries={['/document-view?path=docs/a.md&title=A']}>
+          <DocumentView />
+        </MemoryRouter>,
+      )
+      const cloud = await screen.findByRole('link', { name: 'Cloud' })
+      expect(cloud.getAttribute('href')).toBe('/document-view?path=std%2FCloud.md&title=Cloud')
+      const nope = screen.getByRole('link', { name: 'Nope' })
+      expect(nope.className).toBe('doc-link-unresolved')
+      expect(nope.getAttribute('title')).toBe('Not found: Nope')
+      expect(vi.mocked(fetch).mock.calls.filter(([u]) => u === '/__docs/__index.json')).toHaveLength(1)
     })
 
     it('navigates in the same tab on plain click and refetches the new path', async () => {

@@ -3,9 +3,10 @@
 // files need to be copied where." See
 // specifications/document-links/document-links.plan.md's "File resolution —
 // one URL shape, three environments".
-import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs'
-import { isAbsolute, relative, resolve, sep } from 'node:path'
-import { hasHiddenSegment, hasMarkdownExtension } from './docPath'
+import { copyFileSync, existsSync, mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs'
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
+import { hasHiddenSegment, hasMarkdownExtension, listMarkdownFiles } from './docPath'
+import { extractDocLinks, resolveDocLink, resolveWikilink } from './docLinks'
 import { parseDSL } from './dsl'
 import { forEachElementHelper } from '@/store/workspace-helpers'
 import type { Workspace } from '@/types/model'
@@ -39,16 +40,63 @@ export function findReferencedDocumentPaths(workspaces: Workspace[]): string[] {
     return ordered
 }
 
+/** Upper bound on documents copied per build (DSL-referenced plus linked). */
+export const MAX_COLLECTED_DOCUMENTS = 2000
+
 export interface DocumentCopyPlan {
     /** from: absolute source path on disk; to: path under __docs/ (e.g. `__docs/architecture/overview.md`). */
     copies: Array<{ from: string; to: string }>
     /** Referenced paths with no file on disk, or that fail the project-root containment check. */
     missing: string[]
+    /** Non-fatal notes for the caller to print (e.g. the crawl cap was hit). */
+    warnings: string[]
+}
+
+/**
+ * Resolves `docPath` (relative to `resolvedRoot`) to a copyable file, or null
+ * when it is absolute, not markdown, hidden, escapes the root (textually or
+ * through a symlink), or is not a file. `rel` is the normalised, contained
+ * root-relative POSIX path — the only safe source for the destination: a raw
+ * `../`-containing path can resolve to a real file inside the root while its
+ * own `..` segments, pasted after `__docs/`, would climb out of outDir.
+ */
+function resolveCopyable(docPath: string, resolvedRoot: string): { from: string; rel: string } | null {
+    if (isAbsolute(docPath)) return null
+    if (!hasMarkdownExtension(docPath) || hasHiddenSegment(docPath)) return null
+
+    const absolute = resolve(resolvedRoot, docPath)
+    const rel = relative(resolvedRoot, absolute)
+    const escapesRoot = rel === '' ? false : rel.startsWith('..') || isAbsolute(rel)
+    if (escapesRoot) return null
+
+    if (!existsSync(absolute) || !statSync(absolute).isFile()) return null
+
+    // Re-check containment against the REAL path: existsSync/statSync above
+    // follow symlinks, so a tracked file that is actually a symlink pointing
+    // outside projectRoot would otherwise pass the textual check and still get
+    // copied. Resolve both sides fresh (the root itself may involve a symlink,
+    // e.g. macOS's /var -> /private/var) so the comparison is apples-to-apples.
+    let realAbsolute: string
+    let realRoot: string
+    try {
+        realAbsolute = realpathSync(absolute)
+        realRoot = realpathSync(resolvedRoot)
+    } catch {
+        return null
+    }
+    const realRel = relative(realRoot, realAbsolute)
+    const realEscapesRoot = realRel === '' ? false : realRel.startsWith('..') || isAbsolute(realRel)
+    if (realEscapesRoot) return null
+
+    return { from: absolute, rel: rel.split(sep).join('/') }
 }
 
 /**
  * Parse each given `.dsl` file, collect every referenced document path across
- * all of them (deduped), and resolve each against `projectRoot`.
+ * all of them (deduped), resolve each against `projectRoot`, then crawl the
+ * copied documents transitively: markdown links, inline-code `.md` mentions
+ * and Obsidian wikilinks inside a copied document pull their targets in too
+ * (same allowlist/containment checks; capped at MAX_COLLECTED_DOCUMENTS).
  *
  * Never throws on a missing file or a build misconfiguration — that's the
  * expected, handled case for both the prod build (a missing file is a
@@ -67,46 +115,74 @@ export function planDocumentCopies(dslFilePaths: string[], projectRoot: string):
 
     const copies: Array<{ from: string; to: string }> = []
     const missing: string[] = []
+    const warnings: string[] = []
+    const copiedRels = new Set<string>()
+    const missingSeen = new Set<string>()
+    const queue: Array<{ from: string; rel: string }> = []
+    let capWarned = false
 
-    for (const docPath of referencedPaths) {
-        if (isAbsolute(docPath)) { missing.push(docPath); continue }
-        if (!hasMarkdownExtension(docPath) || hasHiddenSegment(docPath)) { missing.push(docPath); continue }
-
-        const absolute = resolve(resolvedRoot, docPath)
-        const rel = relative(resolvedRoot, absolute)
-        const escapesRoot = rel === '' ? false : rel.startsWith('..') || isAbsolute(rel)
-        if (escapesRoot) { missing.push(docPath); continue }
-
-        if (!existsSync(absolute) || !statSync(absolute).isFile()) { missing.push(docPath); continue }
-
-        // Re-check containment against the REAL path: existsSync/statSync
-        // above follow symlinks, so a tracked file that is actually a symlink
-        // pointing outside projectRoot would otherwise pass the textual
-        // check above and still get copied. Resolve both sides fresh (the
-        // root itself may involve a symlink, e.g. macOS's /var -> /private/var)
-        // so the comparison is apples-to-apples.
-        let realAbsolute: string
-        let realRoot: string
-        try {
-            realAbsolute = realpathSync(absolute)
-            realRoot = realpathSync(resolvedRoot)
-        } catch {
-            missing.push(docPath)
-            continue
-        }
-        const realRel = relative(realRoot, realAbsolute)
-        const realEscapesRoot = realRel === '' ? false : realRel.startsWith('..') || isAbsolute(realRel)
-        if (realEscapesRoot) { missing.push(docPath); continue }
-
-        // Destination is built from the already-normalized `rel`, never the
-        // raw `docPath` — a raw `../`-containing path can resolve to a real
-        // SOURCE file inside projectRoot while its own `..` segments, pasted
-        // verbatim after `__docs/`, would climb back OUT of the caller's
-        // outDir when joined. `rel` has already been through path
-        // resolution/normalization and is confirmed contained, so it's safe
-        // to use verbatim.
-        copies.push({ from: absolute, to: '__docs/' + rel.split(sep).join('/') })
+    const addMissing = (path: string): void => {
+        if (missingSeen.has(path)) return
+        missingSeen.add(path)
+        missing.push(path)
     }
 
-    return { copies, missing }
+    const collect = (docPath: string): void => {
+        const found = resolveCopyable(docPath, resolvedRoot)
+        if (!found) return addMissing(docPath)
+        if (copiedRels.has(found.rel)) return
+        if (copiedRels.size >= MAX_COLLECTED_DOCUMENTS) {
+            if (!capWarned) {
+                capWarned = true
+                warnings.push(`stopped collecting linked documents after ${MAX_COLLECTED_DOCUMENTS}; some links in the build may not resolve`)
+            }
+            return
+        }
+        copiedRels.add(found.rel)
+        copies.push({ from: found.from, to: '__docs/' + found.rel })
+        queue.push(found)
+    }
+
+    for (const docPath of referencedPaths) collect(docPath)
+
+    let rootIndex: string[] | undefined
+    for (let i = 0; i < queue.length; i++) {
+        const { from, rel } = queue[i]
+        let text: string
+        try {
+            text = readFileSync(from, 'utf8')
+        } catch {
+            continue
+        }
+        const { hrefs, wikilinks } = extractDocLinks(text)
+        for (const href of hrefs) {
+            const link = resolveDocLink(rel, href)
+            if (link.kind === 'doc') collect(link.path)
+        }
+        for (const raw of wikilinks) {
+            rootIndex ??= listMarkdownFiles(resolvedRoot).files
+            const link = resolveWikilink(rel, raw, rootIndex)
+            if (link.kind === 'doc') collect(link.path)
+            else if (link.kind === 'unresolved') addMissing(link.path)
+        }
+    }
+
+    return { copies, missing, warnings }
+}
+
+/**
+ * Copies the planned documents under `outDir` and writes `__docs/__index.json`
+ * (`{ files }`, exactly the copied docs) — the list the viewer resolves
+ * wikilinks against. The one place both build paths (vite closeBundle and
+ * scripts/build-viewer.mjs) emit documents.
+ */
+export function writeDocumentCopies(plan: Pick<DocumentCopyPlan, 'copies'>, outDir: string): void {
+    for (const { from, to } of plan.copies) {
+        const dest = join(outDir, to)
+        mkdirSync(dirname(dest), { recursive: true })
+        copyFileSync(from, dest)
+    }
+    const files = plan.copies.map(({ to }) => to.slice('__docs/'.length)).sort()
+    mkdirSync(join(outDir, '__docs'), { recursive: true })
+    writeFileSync(join(outDir, '__docs', '__index.json'), JSON.stringify({ files }), 'utf8')
 }

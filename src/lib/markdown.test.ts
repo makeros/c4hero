@@ -82,3 +82,68 @@ describe('renderMarkdownToSafeHtml', () => {
     })
   })
 })
+
+describe('wikilinks', () => {
+  const index = ['Best practice Standards.md', 'standards/Cloud.md', 'standards/CI-CD and supply chain.md', 'standards/Data integrity.md']
+  const render = (md: string, docPath = 'Best practice Standards.md') => renderMarkdownToSafeHtml(md, { docPath, index })
+  const anchors = (html: string) => Array.from(new DOMParser().parseFromString(html, 'text/html').querySelectorAll('a'))
+
+  it('renders [[target]] as a document-view link showing the target name', () => {
+    const [a] = anchors(render('See [[Cloud]].'))
+    expect(a.textContent).toBe('Cloud')
+    expect(a.getAttribute('href')).toBe('/document-view?path=standards%2FCloud.md&title=Cloud')
+    expect(a.getAttribute('data-wikilink')).toBe('Cloud')
+  })
+
+  it('uses the alias, with a plain or an escaped pipe', () => {
+    const links = anchors(render('[[Cloud|the cloud]] and [[Data integrity\\|Data integrity (if GxP applies)]]'))
+    expect(links.map((a) => a.textContent)).toEqual(['the cloud', 'Data integrity (if GxP applies)'])
+    expect(links[1].getAttribute('href')).toContain('path=standards%2FData+integrity.md')
+  })
+
+  it('keeps an escaped pipe inside a GFM table cell as one wikilink', () => {
+    const md = '| Area | Standard |\n| --- | --- |\n| CI | [[CI-CD and supply chain\\|CI/CD and supply chain]] |\n| Cloud | [[Cloud]] |'
+    const html = render(md)
+    const doc = new DOMParser().parseFromString(html, 'text/html')
+    const cells = Array.from(doc.querySelectorAll('tbody tr')).map((tr) => tr.querySelectorAll('td').length)
+    expect(cells).toEqual([2, 2])
+    const links = anchors(html)
+    expect(links.map((a) => a.textContent)).toEqual(['CI/CD and supply chain', 'Cloud'])
+    expect(links[0].getAttribute('href')).toContain('CI-CD+and+supply+chain.md')
+  })
+
+  it('handles headings, in-page anchors and embeds', () => {
+    const html = render('# My Heading\n\n[[Cloud#Storage Tiers]] [[Cloud#Storage Tiers|tiers]] [[#My Heading]] ![[Cloud]]')
+    const links = anchors(html)
+    expect(links.map((a) => a.textContent)).toEqual(['Cloud > Storage Tiers', 'tiers', 'My Heading', 'Cloud'])
+    expect(links[0].getAttribute('href')).toBe('/document-view?path=standards%2FCloud.md&title=Cloud+%3E+Storage+Tiers#storage-tiers')
+    expect(links[2].getAttribute('href')).toBe('#user-content-my-heading')
+    expect(links[3].getAttribute('href')).toBe('/document-view?path=standards%2FCloud.md&title=Cloud')
+  })
+
+  it('marks an unresolved wikilink', () => {
+    const [a] = anchors(render('[[Company profile]]', 'standards/Data integrity.md'))
+    expect(a.classList.contains('doc-link-unresolved')).toBe(true)
+    expect(a.getAttribute('title')).toBe('Not found: Company profile')
+    expect(a.getAttribute('href')).toBe('/document-view?path=standards%2FCompany+profile.md&title=Company+profile')
+  })
+
+  it('falls back to the relative path without an index', () => {
+    const html = renderMarkdownToSafeHtml('[[Cloud]]', { docPath: 'standards/x.md' })
+    expect(anchors(html)[0].getAttribute('href')).toBe('/document-view?path=standards%2FCloud.md&title=Cloud')
+  })
+
+  it('does not touch wikilinks in code spans or blocks', () => {
+    const html = render('`[[Cloud]]`\n\n```\n[[Cloud]]\n```')
+    expect(anchors(html)).toHaveLength(0)
+    expect(html).toContain('[[Cloud]]')
+  })
+
+  it('escapes hostile targets and still sanitizes everything else', () => {
+    const html = render('[[x"><img src=x onerror=alert(1)>]] <img src=x onerror=alert(2)>')
+    const doc = new DOMParser().parseFromString(html, 'text/html')
+    expect(doc.querySelector('[onerror]')).toBeNull()
+    expect(doc.querySelectorAll('img')).toHaveLength(1) // the raw <img>, with onerror stripped
+    expect(doc.querySelector('a[data-wikilink]')?.textContent).toBe('x"><img src=x onerror=alert(1)>')
+  })
+})

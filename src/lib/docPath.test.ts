@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSyn
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { docPathProblem, docsRootFor, isInsideRoot, isInsideRootReal, resolveDocRequest } from './docPath'
+import { docPathProblem, docsRootFor, isInsideRoot, isInsideRootReal, listMarkdownFiles, resolveDocRequest } from './docPath'
 
 describe('docPathProblem', () => {
   it('accepts relative markdown paths', () => {
@@ -87,5 +87,58 @@ describe('docsRootFor / resolveDocRequest', () => {
   })
   it('throws on malformed encoding', () => {
     expect(() => resolveDocRequest('%E0%A4%A', tmp)).toThrow()
+  })
+})
+
+describe('listMarkdownFiles', () => {
+  let root: string
+  let outside: string
+  beforeEach(() => {
+    root = mkdtempSync(path.join(os.tmpdir(), 'listmd-root-'))
+    outside = mkdtempSync(path.join(os.tmpdir(), 'listmd-out-'))
+  })
+  afterEach(() => {
+    rmSync(root, { recursive: true, force: true })
+    rmSync(outside, { recursive: true, force: true })
+  })
+  const write = (rel: string, base = root) => {
+    mkdirSync(path.dirname(path.join(base, rel)), { recursive: true })
+    writeFileSync(path.join(base, rel), '# x')
+  }
+
+  it('lists markdown files recursively as root-relative POSIX paths, skipping other files', () => {
+    write('a.md')
+    write('docs/b.markdown')
+    write('docs/deep/C D.MD')
+    write('docs/notes.txt')
+    expect(listMarkdownFiles(root)).toEqual({
+      files: ['a.md', 'docs/b.markdown', 'docs/deep/C D.MD'],
+      truncated: false,
+    })
+  })
+  it('skips hidden segments and node_modules', () => {
+    write('a.md')
+    write('.git/x.md')
+    write('.hidden.md')
+    write('docs/.private/y.md')
+    write('node_modules/pkg/README.md')
+    expect(listMarkdownFiles(root).files).toEqual(['a.md'])
+  })
+  it('does not follow directory symlinks and drops file symlinks that escape the root', () => {
+    write('a.md')
+    write('out.md', outside)
+    write('sub/in.md', outside)
+    symlinkSync(path.join(outside, 'sub'), path.join(root, 'linkdir'))
+    symlinkSync(path.join(outside, 'out.md'), path.join(root, 'escape.md'))
+    symlinkSync(path.join(root, 'a.md'), path.join(root, 'alias.md'))
+    expect(listMarkdownFiles(root).files).toEqual(['a.md', 'alias.md'])
+  })
+  it('caps the result and flags truncation', () => {
+    for (const n of ['a', 'b', 'c']) write(`${n}.md`)
+    expect(listMarkdownFiles(root, { limit: 2 })).toEqual({ files: ['a.md', 'b.md'], truncated: true })
+    expect(listMarkdownFiles(root, { limit: 3 }).truncated).toBe(false)
+  })
+  it('returns nothing for a missing root', () => {
+    expect(listMarkdownFiles(path.join(root, 'nope'))).toEqual({ files: [], truncated: false })
   })
 })
