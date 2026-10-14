@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react'
 import { ExternalLink, Plus } from 'lucide-react'
 import { useWorkspaceStore } from '@/store/workspace'
 import type { DocLink } from '@/types/model'
+import { documentViewUrl } from '@/lib/documentLinks'
 
 // List editor for an element's/relationship's `documents` field, modeled on
 // `PropertiesTab` (`RightPanel.tsx`) — add row / remove row, same styling —
@@ -31,7 +32,7 @@ export default function DocumentsTab({ documents, onUpdate }: { documents: DocLi
       {documents.length > 0 && (
         <div className="space-y-1.5">
           {documents.map((doc, index) => {
-            const href = `/document-view?${new URLSearchParams({ path: doc.path, title: doc.title }).toString()}`
+            const href = documentViewUrl(doc)
             return (
               <div
                 key={`${doc.path}-${index}`}

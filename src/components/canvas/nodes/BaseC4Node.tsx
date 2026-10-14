@@ -6,6 +6,7 @@ import type { C4NodeData } from './types'
 import StatusDot from './StatusDot'
 import InlineName from './InlineName'
 import NodeHandles from './NodeHandles'
+import DocumentIndicator from '../DocumentIndicator'
 import ZoomHoverCard from './ZoomHoverCard'
 import { useWorkspaceStore } from '@/store/workspace'
 import { useSettingsStore } from '@/store/settings'
@@ -149,6 +150,10 @@ export default function BaseC4Node({
         <div style={{ flex: 1, minWidth: 0, ...(resolvedFontSize != null && { fontSize: `${resolvedFontSize}px` }) }}>
           <InlineName elementId={element.id} name={element.name} lineClamp={nameClamp} textColor={style?.color} />
         </div>
+        {/* Document indicator: outside .c4-node-actions so it is always visible. */}
+        {element.documents && element.documents.length > 0 && (
+          <DocumentIndicator documents={element.documents} subject={element.name} color={style?.color ?? resolvedTypeColor} />
+        )}
         {/* Outside .c4-node-actions on purpose — that container fades out until
             the node is hovered, and a lock nobody can see reads as Auto-arrange
             being broken. */}
