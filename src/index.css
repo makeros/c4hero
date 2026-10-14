@@ -2148,6 +2148,30 @@ body {
   padding: 0;
 }
 
+.c4-node-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+/* Footer buttons share one size so the zoom and document affordances line up. */
+.c4-node-footer .c4-node-footer-btn {
+  min-width: 28px;
+  height: 28px;
+  border-radius: 7px;
+}
+
+.c4-node-footer .c4-doc-indicator.c4-node-footer-btn {
+  justify-content: center;
+  gap: 3px;
+  padding: 0 6px;
+  font-size: var(--text-xs);
+  border-color: var(--glass-overlay-sm);
+  background: var(--glass-overlay-xs);
+}
+
 .c4-node-action-btn:hover {
   background: rgba(255, 255, 255, 0.12);
   border-color: rgba(255, 255, 255, 0.18);

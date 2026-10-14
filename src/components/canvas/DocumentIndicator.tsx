@@ -11,11 +11,14 @@ const MENU_WIDTH = 240
 /** Always-visible canvas hint that an element/relationship has linked
  *  documents. One document opens directly in a new tab; several open a small
  *  anchored menu. Navigation only, so it stays active in the read-only viewer. */
-export default function DocumentIndicator({ documents, subject, color }: {
+export default function DocumentIndicator({ documents, subject, color, size = 11, className }: {
   documents: DocLink[]
   /** Name used in the accessible label, e.g. the element name. */
   subject: string
   color?: string
+  /** Icon size in px — edge labels use the compact default, node footers a larger one. */
+  size?: number
+  className?: string
 }) {
   const { open, setOpen, toggle, triggerRef, popupRef, coords } = useAnchoredPopover<HTMLButtonElement, HTMLDivElement>({
     width: MENU_WIDTH,
@@ -64,7 +67,7 @@ export default function DocumentIndicator({ documents, subject, color }: {
       <button
         ref={triggerRef}
         type="button"
-        className="c4-doc-indicator nodrag nopan"
+        className={`c4-doc-indicator nodrag nopan${className ? ` ${className}` : ''}`}
         style={color ? { color } : undefined}
         title={tooltip}
         aria-label={label}
@@ -80,7 +83,7 @@ export default function DocumentIndicator({ documents, subject, color }: {
           else toggle()
         }}
       >
-        <FileText size={11} aria-hidden="true" />
+        <FileText size={size} aria-hidden="true" />
         {!single && <span className="c4-doc-indicator-count">{count}</span>}
       </button>
       {!single && open && coords && createPortal(
