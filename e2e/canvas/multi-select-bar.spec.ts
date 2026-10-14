@@ -176,6 +176,19 @@ test.describe('multi-select bar — align', () => {
     expect(landscape).toBeTruthy()
     await workspace.setView(landscape!.key)
 
+    // Make the nodes genuinely differ in height: the customer loses its
+    // description, ATM gets one long enough to fill the node's 3-line clamp.
+    // Without this the fixed-height node chrome (e.g. the footer row) evens
+    // the sample nodes out to within a few pixels.
+    await workspace.page.evaluate(() => {
+      type S = { updateElement: (id: string, patch: { description: string }) => void }
+      const store = (window as unknown as { __testStore?: () => S }).__testStore?.()
+      store?.updateElement('customer', { description: '' })
+      store?.updateElement('atm', {
+        description: 'Allows customers to withdraw cash, deposit cheques, check balances, change PINs and print mini statements at any branch or partner location, around the clock, every day of the year.',
+      })
+    })
+
     await setActiveViewPositions(workspace.page, [
       { id: 'customer', x: 100, y: 80 },
       { id: 'atm', x: 560, y: 280 },

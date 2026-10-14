@@ -24,7 +24,7 @@ test.describe('Toolbar', () => {
   model {
     customer = person "Personal Banking Customer" "A customer of the bank, with personal bank accounts."
     atm = softwareSystem "ATM" "Allows customers to withdraw cash."
-    mainframe = softwareSystem "Mainframe Banking System" "Stores all of the core banking information about customers, accounts, transactions, etc."
+    mainframe = softwareSystem "Mainframe Banking System" "Stores all of the core banking information about customers, accounts, transactions, payments, statements, balances, limits, audit trails and every other record of the bank, and is the single system of record for all of them."
 
     customer -> atm "Withdraws cash using"
     atm -> mainframe "Uses"
