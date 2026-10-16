@@ -187,7 +187,7 @@ export default function DocumentView() {
         onClick={handleClick}
         className="document-view-content"
         style={{
-          maxWidth: 760,
+          maxWidth: 1220,
           margin: '0 auto',
           background: 'var(--color-surface-1)',
           border: '1px solid var(--color-border)',
