@@ -1,27 +1,8 @@
 import type { StateCreator } from 'zustand'
 import type { WorkspaceState } from '../workspace-types'
-import type { Relationship, View, Workspace } from '@/types/model'
+import type { Relationship } from '@/types/model'
 import { nanoid, pushUndoSnapshot } from '../internals'
-import { allViewsOf, elementExists, findViewHelper } from '../workspace-helpers'
-
-/** Sequential renumber + membership recompute after any step edit.
- *
- *  Orders regenerate 1..n, which flattens parallel-sequence numbering — the
- *  editor is a linear list, so an edit is the user restating the sequence as
- *  linear. Membership is a projection of the steps (steps are all that
- *  serializes), so elements whose last step died drop out here. */
-function normalizeDynamicView(ws: Workspace, view: View): void {
-  view.relationships.forEach((step, i) => { step.order = String(i + 1) })
-  const endpoints = new Set<string>()
-  for (const step of view.relationships) {
-    const rel = ws.model.relationships.find(r => r.id === step.id)
-    const sourceId = step.sourceId ?? rel?.sourceId
-    const destId = step.destinationId ?? rel?.destinationId
-    if (sourceId) endpoints.add(sourceId)
-    if (destId) endpoints.add(destId)
-  }
-  view.elements = view.elements.filter(e => endpoints.has(e.id))
-}
+import { allViewsOf, elementExists, findViewHelper, normalizeDynamicView } from '../workspace-helpers'
 
 export type DynamicStepSlice = Pick<WorkspaceState,
   | 'addDynamicStep' | 'updateDynamicStepDescription'

@@ -13,12 +13,13 @@ import App from './App'
 // canvas route without needing MemoryRouter's own location to drive it —
 // App.tsx reads location via the `useLocation` hook directly.
 const routerState = vi.hoisted(() => ({ pathname: '/' }))
+const navigateSpy = vi.hoisted(() => vi.fn())
 
 vi.mock('react-router-dom', async (importOriginal) => {
   const actual = await importOriginal<typeof import('react-router-dom')>()
   return {
     ...actual,
-    useNavigate: () => vi.fn(),
+    useNavigate: () => navigateSpy,
     useLocation: () => ({ pathname: routerState.pathname, search: '', hash: '', state: null, key: 'test' }),
     useParams: () => ({}),
   }
@@ -67,6 +68,9 @@ vi.mock('@/components/welcome/WelcomeScreen', () => ({
 vi.mock('@/components/ai/AiPanel', () => ({
   default: () => <div data-testid="ai-panel" />,
 }))
+vi.mock('@/components/views/DocumentView', () => ({
+  default: () => <div data-testid="document-view" />,
+}))
 
 function makeWs(name = 'Locked WS'): Workspace {
   return {
@@ -97,6 +101,7 @@ beforeEach(() => {
   useWorkspaceStore.getState().closeWorkspace()
   vi.mocked(getLockedWorkspace).mockReset().mockReturnValue(null)
   vi.mocked(loadFromLocalStorage).mockReset().mockReturnValue(null)
+  navigateSpy.mockClear()
 })
 
 afterEach(() => {
@@ -179,5 +184,23 @@ describe('App — locked-workspace startup bootstrap', () => {
     })
     expect(useWorkspaceStore.getState().workspace?.name).toBe('Locked WS')
     expect(loadFromLocalStorage).not.toHaveBeenCalled()
+  })
+
+  it('does not redirect away from /document-view when the locked workspace auto-loads', async () => {
+    const ws = makeWs()
+    vi.mocked(getLockedWorkspace).mockReturnValue(ws)
+    routerState.pathname = '/document-view'
+
+    render(
+      <MemoryRouter initialEntries={['/document-view?path=docs/readme.md']}>
+        <App />
+      </MemoryRouter>,
+    )
+
+    await waitFor(() => {
+      expect(useWorkspaceStore.getState().workspace?.name).toBe('Locked WS')
+    })
+    await screen.findByTestId('document-view')
+    expect(navigateSpy).not.toHaveBeenCalled()
   })
 })

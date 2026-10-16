@@ -6,6 +6,7 @@ import type { C4NodeData } from './types'
 import StatusDot from './StatusDot'
 import InlineName from './InlineName'
 import NodeHandles from './NodeHandles'
+import DocumentIndicator from '../DocumentIndicator'
 import ZoomHoverCard from './ZoomHoverCard'
 import { useWorkspaceStore } from '@/store/workspace'
 import { useSettingsStore } from '@/store/settings'
@@ -53,6 +54,7 @@ export default function BaseC4Node({
   const reasonLabel = data.highlighted ? pickHighlightReason(data.element, filters) : null
   const selected = rfSelected || storeSelected
   const { element, childCount, onDrillIn, viewCount = 1 } = data
+  const hasDocuments = !!element.documents && element.documents.length > 0
   const desc = element.description ?? ''
   const style = data.style
 
@@ -173,9 +175,6 @@ export default function BaseC4Node({
               {viewCount}×
             </span>
           )}
-          {childCount !== undefined && (
-            <ZoomButton element={element} typeColor={resolvedTypeColor} onDrillIn={onDrillIn} />
-          )}
         </div>
       </div>
 
@@ -216,6 +215,25 @@ export default function BaseC4Node({
           </span>
         ))}
       </div>
+
+      {/* Footer: always-visible, left-aligned node affordances — drill into the
+          child diagram and open linked documents. */}
+      {(childCount !== undefined || hasDocuments) && (
+        <div className="c4-node-footer">
+          {childCount !== undefined && (
+            <ZoomButton element={element} typeColor={resolvedTypeColor} onDrillIn={onDrillIn} />
+          )}
+          {hasDocuments && (
+            <DocumentIndicator
+              documents={element.documents!}
+              subject={element.name}
+              color={style?.color ?? resolvedTypeColor}
+              size={15}
+              className="c4-node-footer-btn"
+            />
+          )}
+        </div>
+      )}
 
       <NodeHandles />
       {reasonLabel && (
@@ -272,12 +290,12 @@ function ZoomButton({ element, typeColor, onDrillIn }: {
       onMouseLeave={scheduleHide}
     >
       <button
-        className="c4-node-action-btn nodrag"
+        className="c4-node-action-btn c4-node-footer-btn nodrag"
         style={{ color: typeColor }}
         onClick={(e) => { e.stopPropagation(); onDrillIn?.(element.id) }}
         aria-label={`Zoom into ${element.name}`}
       >
-        <ZoomIn size={11} aria-hidden="true" />
+        <ZoomIn size={15} aria-hidden="true" />
       </button>
       {hovered && <ZoomHoverCard element={element} typeColor={typeColor} />}
     </div>

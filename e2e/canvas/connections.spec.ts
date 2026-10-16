@@ -64,40 +64,8 @@ test.describe('Node Connections', () => {
     const edgesBefore = await workspace.getEdgeCount()
     expect(edgesBefore).toBe(0)
 
-    // Connect the two nodes
-    const nodes = workspace.page.locator('.react-flow__node')
-    const nodeA = nodes.first()
-    const nodeB = nodes.last()
-
-    const nodeABox = await nodeA.boundingBox()
-    const nodeBBox = await nodeB.boundingBox()
-
-    if (!nodeABox || !nodeBBox) throw new Error('Could not get node bounding boxes')
-
-    // Hover nodeA to show source handles
-    await nodeA.hover()
-    await workspace.page.waitForTimeout(300)
-
-    // Drag from a center source handle to nodeB
-    const handle = nodeA.locator('[data-handleid$="-b-source"]').first()
-    const handleBox = await handle.boundingBox()
-    if (!handleBox) throw new Error('Could not find source handle')
-
-    const startX = handleBox.x + handleBox.width / 2
-    const startY = handleBox.y + handleBox.height / 2
-    const endX = nodeBBox.x + nodeBBox.width / 2
-    const endY = nodeBBox.y + nodeBBox.height / 2
-
-    await workspace.page.mouse.move(startX, startY)
-    await workspace.page.mouse.down()
-    for (let i = 1; i <= 10; i++) {
-      await workspace.page.mouse.move(
-        startX + ((endX - startX) * i) / 10,
-        startY + ((endY - startY) * i) / 10,
-      )
-    }
-    await workspace.page.mouse.up()
-    await workspace.page.waitForTimeout(400)
+    await workspace.fitView()
+    await workspace.connectNodes('New System', 'New System 2')
 
     const edgesAfter = await workspace.getEdgeCount()
     expect(edgesAfter).toBe(1)
@@ -111,30 +79,8 @@ test.describe('Node Connections', () => {
     await workspace.page.keyboard.press('Shift+S')
     await workspace.page.waitForTimeout(400)
 
-    const nodes = workspace.page.locator('.react-flow__node')
-    const nodeA = nodes.first()
-    const nodeB = nodes.last()
-
-    const nodeBBox = await nodeB.boundingBox()
-    if (!nodeBBox) throw new Error('Could not get node B bounding box')
-
-    await nodeA.hover()
-    await workspace.page.waitForTimeout(300)
-
-    const handle = nodeA.locator('[data-handleid$="-b-source"]').first()
-    const handleBox = await handle.boundingBox()
-    if (!handleBox) throw new Error('Could not find source handle')
-
-    await workspace.page.mouse.move(handleBox.x + handleBox.width / 2, handleBox.y + handleBox.height / 2)
-    await workspace.page.mouse.down()
-    for (let i = 1; i <= 10; i++) {
-      await workspace.page.mouse.move(
-        handleBox.x + handleBox.width / 2 + ((nodeBBox.x + nodeBBox.width / 2 - (handleBox.x + handleBox.width / 2)) * i) / 10,
-        handleBox.y + handleBox.height / 2 + ((nodeBBox.y + nodeBBox.height / 2 - (handleBox.y + handleBox.height / 2)) * i) / 10,
-      )
-    }
-    await workspace.page.mouse.up()
-    await workspace.page.waitForTimeout(400)
+    await workspace.fitView()
+    await workspace.connectNodes('New System', 'New System 2')
 
     const edge = workspace.page.locator('.react-flow__edge path[marker-end]').first()
     await expect(edge).toBeAttached()
@@ -152,35 +98,8 @@ test.describe('Node Connections', () => {
     await workspace.page.keyboard.press('Shift+S')
     await workspace.page.waitForTimeout(400)
 
-    const nodes = workspace.page.locator('.react-flow__node')
-    const nodeA = nodes.first()
-    const nodeB = nodes.last()
-
-    const nodeBBox = await nodeB.boundingBox()
-    if (!nodeBBox) throw new Error('Could not get node B bounding box')
-
-    // Helper to do one drag connection
-    const doConnect = async () => {
-      await nodeA.hover()
-      await workspace.page.waitForTimeout(200)
-      const handle = nodeA.locator('[data-handleid$="-b-source"]').first()
-      const handleBox = await handle.boundingBox()
-      if (!handleBox) return
-      const startX = handleBox.x + handleBox.width / 2
-      const startY = handleBox.y + handleBox.height / 2
-      const endX = nodeBBox.x + nodeBBox.width / 2
-      const endY = nodeBBox.y + nodeBBox.height / 2
-      await workspace.page.mouse.move(startX, startY)
-      await workspace.page.mouse.down()
-      for (let i = 1; i <= 10; i++) {
-        await workspace.page.mouse.move(
-          startX + ((endX - startX) * i) / 10,
-          startY + ((endY - startY) * i) / 10,
-        )
-      }
-      await workspace.page.mouse.up()
-      await workspace.page.waitForTimeout(400)
-    }
+    await workspace.fitView()
+    const doConnect = () => workspace.connectNodes('New System', 'New System 2')
 
     await doConnect()
     expect(await workspace.getEdgeCount()).toBe(1)

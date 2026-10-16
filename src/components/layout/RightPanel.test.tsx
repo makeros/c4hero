@@ -104,6 +104,26 @@ describe('RightPanel', () => {
     expect(screen.getByDisplayValue('uses')).toBeTruthy()
   })
 
+  it('shows document link rows when selecting an element with documents set', () => {
+    const ws = makeWs()
+    ws.model.people[0].documents = [{ path: 'docs/alice.md', title: 'Alice overview' }]
+    useWorkspaceStore.getState().loadWorkspace(ws)
+    useWorkspaceStore.getState().selectElements(['alice'])
+    render(<RightPanel />)
+    expect(screen.getByText('Alice overview')).toBeTruthy()
+    expect(screen.getByText(/docs\/alice\.md/)).toBeTruthy()
+  })
+
+  it('shows document link rows when selecting a relationship with documents set', () => {
+    const ws = makeWs()
+    ws.model.relationships[0].documents = [{ path: 'docs/rel1.md', title: 'Rel1 overview' }]
+    useWorkspaceStore.getState().loadWorkspace(ws)
+    useWorkspaceStore.getState().selectRelationship('rel1')
+    render(<RightPanel />)
+    expect(screen.getByText('Rel1 overview')).toBeTruthy()
+    expect(screen.getByText(/docs\/rel1\.md/)).toBeTruthy()
+  })
+
   it('keeps relationship defaults neutral until explicitly set and allows clearing them', async () => {
     const user = userEvent.setup()
     useWorkspaceStore.getState().loadWorkspace(makeWs())

@@ -486,6 +486,40 @@ describe('Relationship and container mutations', () => {
     expect(rel.lineStyle).toBe('dashed')
   })
 
+  it('updateRelationship sets documents on a relationship with none', () => {
+    const relId = useWorkspaceStore.getState().addRelationship('alice', 'api', 'calls')
+    const docs = [{ path: 'architecture/payments-overview.md', title: 'Service overview' }]
+    useWorkspaceStore.getState().updateRelationship(relId, { documents: docs })
+    const rel = useWorkspaceStore.getState().workspace!.model.relationships.find(r => r.id === relId)!
+    expect(rel.documents).toEqual(docs)
+  })
+
+  it('updateRelationship changes an existing documents array', () => {
+    const relId = useWorkspaceStore.getState().addRelationship('alice', 'api', 'calls')
+    useWorkspaceStore.getState().updateRelationship(relId, { documents: [{ path: 'a.md', title: 'A' }] })
+    const newDocs = [{ path: 'a.md', title: 'A' }, { path: 'b.md', title: 'B' }]
+    useWorkspaceStore.getState().updateRelationship(relId, { documents: newDocs })
+    const rel = useWorkspaceStore.getState().workspace!.model.relationships.find(r => r.id === relId)!
+    expect(rel.documents).toEqual(newDocs)
+  })
+
+  it('updateRelationship clears documents when passed undefined', () => {
+    const relId = useWorkspaceStore.getState().addRelationship('alice', 'api', 'calls')
+    useWorkspaceStore.getState().updateRelationship(relId, { documents: [{ path: 'a.md', title: 'A' }] })
+    useWorkspaceStore.getState().updateRelationship(relId, { documents: undefined })
+    const rel = useWorkspaceStore.getState().workspace!.model.relationships.find(r => r.id === relId)!
+    expect(rel.documents).toBeUndefined()
+  })
+
+  it('updateRelationship is a no-op (no undo entry) when documents value is unchanged', () => {
+    const relId = useWorkspaceStore.getState().addRelationship('alice', 'api', 'calls')
+    const docs = [{ path: 'a.md', title: 'A' }]
+    useWorkspaceStore.getState().updateRelationship(relId, { documents: docs })
+    const undoBefore = useWorkspaceStore.getState().undoStack.length
+    useWorkspaceStore.getState().updateRelationship(relId, { documents: [{ path: 'a.md', title: 'A' }] }) // same value, new array instance
+    expect(useWorkspaceStore.getState().undoStack.length).toBe(undoBefore)
+  })
+
   it('reconnectRelationship updates source and destination', () => {
     const relId = useWorkspaceStore.getState().addRelationship('alice', 'api', 'calls')
     const newSysId = useWorkspaceStore.getState().addSoftwareSystem('Other')
@@ -703,6 +737,41 @@ describe('Relationship and container mutations', () => {
     useWorkspaceStore.getState().updateElement('alice', { name: 'Alice Smith' })
     expect(useWorkspaceStore.getState().undoStack.length).toBe(undoBefore + 1)
     expect(useWorkspaceStore.getState().workspace!.model.people.find(p => p.id === 'alice')!.name).toBe('Alice Smith')
+  })
+
+  it('updateElement sets documents on an element with none', () => {
+    const docs = [{ path: 'architecture/payments-overview.md', title: 'Service overview' }]
+    useWorkspaceStore.getState().updateElement('alice', { documents: docs })
+    expect(useWorkspaceStore.getState().workspace!.model.people.find(p => p.id === 'alice')!.documents).toEqual(docs)
+  })
+
+  it('updateElement changes an existing documents array', () => {
+    useWorkspaceStore.getState().updateElement('alice', { documents: [{ path: 'a.md', title: 'A' }] })
+    const newDocs = [{ path: 'a.md', title: 'A' }, { path: 'b.md', title: 'B' }]
+    useWorkspaceStore.getState().updateElement('alice', { documents: newDocs })
+    expect(useWorkspaceStore.getState().workspace!.model.people.find(p => p.id === 'alice')!.documents).toEqual(newDocs)
+  })
+
+  it('updateElement clears documents when passed undefined', () => {
+    useWorkspaceStore.getState().updateElement('alice', { documents: [{ path: 'a.md', title: 'A' }] })
+    useWorkspaceStore.getState().updateElement('alice', { documents: undefined })
+    expect(useWorkspaceStore.getState().workspace!.model.people.find(p => p.id === 'alice')!.documents).toBeUndefined()
+  })
+
+  it('updateElement is a no-op (no undo entry) when documents value is unchanged', () => {
+    const docs = [{ path: 'a.md', title: 'A' }]
+    useWorkspaceStore.getState().updateElement('alice', { documents: docs })
+    const undoBefore = useWorkspaceStore.getState().undoStack.length
+    useWorkspaceStore.getState().updateElement('alice', { documents: [{ path: 'a.md', title: 'A' }] }) // same value, new array instance
+    expect(useWorkspaceStore.getState().undoStack.length).toBe(undoBefore)
+  })
+
+  it('updateElementLive sets documents without pushing undo', () => {
+    const undoBefore = useWorkspaceStore.getState().undoStack.length
+    const docs = [{ path: 'a.md', title: 'A' }]
+    useWorkspaceStore.getState().updateElementLive('alice', { documents: docs })
+    expect(useWorkspaceStore.getState().workspace!.model.people.find(p => p.id === 'alice')!.documents).toEqual(docs)
+    expect(useWorkspaceStore.getState().undoStack.length).toBe(undoBefore)
   })
 
   it('addContainer creates container under the specified softwareSystem', () => {

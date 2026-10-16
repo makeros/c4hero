@@ -1,6 +1,6 @@
 import type { StateCreator } from 'zustand'
 import type { WorkspaceState } from '../workspace-types'
-import type { Person, SoftwareSystem, Container, Component } from '@/types/model'
+import type { Person, SoftwareSystem, Container, Component, View, Workspace } from '@/types/model'
 import { announce } from '@/lib/announce'
 import { nanoid, pushUndoSnapshot } from '../internals'
 import {
@@ -11,7 +11,10 @@ import {
   uniqueElementName,
   findViewHelper,
   appendScopedView,
+  invalidateElementIndex,
+  findElementHelper,
   selectCreated,
+  normalizeDynamicView,
 } from '../workspace-helpers'
 import { getFirstViewKey } from '../workspace-selectors'
 
@@ -22,8 +25,68 @@ import { getFirstViewKey } from '../workspace-selectors'
 export type ElementSlice = Pick<WorkspaceState,
   | 'addPerson' | 'addSoftwareSystem' | 'addContainer' | 'addComponent'
   | 'updateElement' | 'updateElementLive' | 'updateElementTechnology'
-  | 'deleteElement' | 'deleteElements' | 'duplicateElements'
+  | 'deleteElement' | 'deleteElements' | 'duplicateElements' | 'moveElement'
 >
+
+/** Drop the ids from a view and prune relationship refs left without both endpoints. */
+function removeFromView(ws: Workspace, view: View, ids: ReadonlySet<string>): void {
+  view.elements = view.elements.filter(e => !ids.has(e.id))
+  const present = new Set(view.elements.map(e => e.id))
+  const relById = new Map(ws.model.relationships.map(r => [r.id, r]))
+  view.relationships = view.relationships.filter((r) => {
+    const rel = relById.get(r.id)
+    return !rel || (present.has(rel.sourceId) && present.has(rel.destinationId))
+  })
+}
+
+/** Add an element to a view plus the relationships it has to elements already shown. */
+function addToScopedView(ws: Workspace, view: View, id: string): void {
+  if (!view.elements.some(e => e.id === id)) view.elements.push({ id })
+  const present = new Set(view.elements.map(e => e.id))
+  for (const r of ws.model.relationships) {
+    if (r.sourceId !== id && r.destinationId !== id) continue
+    if (!present.has(r.sourceId) || !present.has(r.destinationId)) continue
+    if (!view.relationships.some(vr => vr.id === r.id)) view.relationships.push({ id: r.id })
+  }
+}
+
+/** The software system that owns a container or component (undefined for top-level elements). */
+function owningSystemId(ws: Workspace, id: string): string | undefined {
+  return ws.model.softwareSystems.find(sys =>
+    sys.containers.some(c => c.id === id || c.components.some(comp => comp.id === id)),
+  )?.id
+}
+
+/** Drop dynamic steps that stopped being valid for their view's scope because an endpoint
+ *  left it: a system-scoped view only shows containers/components of that system, a
+ *  container-scoped view only the components of that container. Steps that were already
+ *  out of scope before the move are left alone. */
+function dropInvalidDynamicSteps(
+  ws: Workspace,
+  movedId: string,
+  moved: ReadonlySet<string>,
+  oldSystemId: string | undefined,
+  oldContainerId: string | undefined,
+): void {
+  const relById = new Map(ws.model.relationships.map(r => [r.id, r]))
+  for (const v of ws.views.dynamicViews ?? []) {
+    const scopeSystemId = v.softwareSystemId
+    const scopeContainerId = v.containerId
+    if (!scopeSystemId && !scopeContainerId) continue
+    const leftScope = (endpoint: string | undefined): boolean => {
+      if (!endpoint || !moved.has(endpoint)) return false
+      if (scopeSystemId) return oldSystemId === scopeSystemId && owningSystemId(ws, endpoint) !== scopeSystemId
+      return oldContainerId === scopeContainerId && endpoint === movedId
+    }
+    const kept = v.relationships.filter((step) => {
+      const rel = relById.get(step.id)
+      return !(leftScope(step.sourceId ?? rel?.sourceId) || leftScope(step.destinationId ?? rel?.destinationId))
+    })
+    if (kept.length === v.relationships.length) continue
+    v.relationships = kept
+    normalizeDynamicView(ws, v)
+  }
+}
 
 export const createElementSlice: StateCreator<
   WorkspaceState,
@@ -178,6 +241,80 @@ export const createElementSlice: StateCreator<
     if (!applyElementPatch(s.workspace, id, { technology })) return
     pushUndoSnapshot(s)
   }),
+
+  moveElement: (id, newParentId) => {
+    if (get().readOnly) return false
+    let moved = false
+    set((s) => {
+      if (!s.workspace) return
+      const ws = s.workspace
+      const systems = ws.model.softwareSystems
+      let oldSystemId: string | undefined
+      let oldContainerId: string | undefined
+      let ids: string[] | undefined
+      let place: (() => void) | undefined
+
+      const fromSystem = systems.find(sys => sys.containers.some(c => c.id === id))
+      if (fromSystem) {
+        const target = systems.find(sys => sys.id === newParentId)
+        if (!target || target === fromSystem) return
+        const container = fromSystem.containers.find(c => c.id === id)!
+        oldSystemId = fromSystem.id
+        ids = [id, ...container.components.map(c => c.id)]
+        place = () => {
+          fromSystem.containers = fromSystem.containers.filter(c => c.id !== id)
+          target.containers.push(container)
+        }
+      } else {
+        const fromContainer = systems.flatMap(sys => sys.containers).find(c => c.components.some(comp => comp.id === id))
+        if (!fromContainer) return
+        const target = systems.flatMap(sys => sys.containers).find(c => c.id === newParentId)
+        if (!target || target === fromContainer) return
+        const component = fromContainer.components.find(c => c.id === id)!
+        oldContainerId = fromContainer.id
+        oldSystemId = owningSystemId(ws, id)
+        ids = [id]
+        place = () => {
+          fromContainer.components = fromContainer.components.filter(c => c.id !== id)
+          target.components.push(component)
+        }
+      }
+
+      pushUndoSnapshot(s)
+      place()
+      invalidateElementIndex(ws)
+      const movedIds = new Set(ids)
+
+      // Leave the views scoped to the old parent (descendants included).
+      for (const v of ws.views.containerViews) {
+        if (oldContainerId === undefined && v.softwareSystemId === oldSystemId) removeFromView(ws, v, movedIds)
+      }
+      for (const v of ws.views.componentViews) {
+        if (oldContainerId !== undefined && v.containerId === oldContainerId) removeFromView(ws, v, movedIds)
+      }
+      // Leave groups of the old parent. Only the moved element itself: groups of
+      // its children belong to it and travel with it.
+      for (const g of ws.model.groups) g.elementIds = g.elementIds.filter(eid => eid !== id)
+      dropInvalidDynamicSteps(ws, id, movedIds, oldSystemId, oldContainerId)
+
+      // Join the views scoped to the new parent the way addContainer/addComponent do
+      // (without switching the active view).
+      const element = oldContainerId === undefined ? 'container' : 'component'
+      const views = element === 'container' ? ws.views.containerViews : ws.views.componentViews
+      const scoped = views.filter(v => (element === 'container' ? v.softwareSystemId : v.containerId) === newParentId)
+      for (const v of scoped) addToScopedView(ws, v, id)
+      if (scoped.length === 0) {
+        const parentName = findElementHelper(ws, newParentId)?.name ?? newParentId
+        appendScopedView(ws, element, newParentId, element === 'container' ? `${parentName} — Containers` : `${parentName} — Components`, nanoid(8))
+      }
+      moved = true
+    })
+    if (moved) {
+      get().revalidateScope()
+      announce('Element moved')
+    }
+    return moved
+  },
 
   deleteElement: (id) => {
     if (get().readOnly) return

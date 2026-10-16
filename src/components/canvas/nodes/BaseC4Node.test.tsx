@@ -306,4 +306,65 @@ describe('BaseC4Node zoom button', () => {
     await new Promise((r) => setTimeout(r, 250))
     expect(screen.queryByText('New diagram')).not.toBeNull()
   })
+
+  describe('document indicator', () => {
+    const one = [{ path: 'architecture/overview.md', title: 'Overview' }]
+    const two = [...one, { path: 'adr/001.md', title: 'ADR 1' }]
+
+    afterEach(() => { vi.restoreAllMocks() })
+
+    it('is absent without documents', () => {
+      renderNode()
+      expect(screen.queryByLabelText(/document/i)).toBeNull()
+    })
+
+    it('renders for one document without a count, outside the fading actions', () => {
+      const { node } = renderNode({ element: { documents: one }, data: { childCount: 1 } })
+      const btn = screen.getByLabelText('1 document for Payment API')
+      expect(btn.querySelector('.c4-doc-indicator-count')).toBeNull()
+      expect(node.querySelector('.c4-node-actions')?.contains(btn)).toBe(false)
+      expect(btn.getAttribute('title')).toBe('Overview')
+    })
+
+    it('shows a count for two or more documents', () => {
+      renderNode({ element: { documents: two } })
+      const btn = screen.getByLabelText('2 documents for Payment API')
+      expect(btn.textContent).toBe('2')
+    })
+
+    it('opens the single document in a new tab without selecting the node', () => {
+      const open = vi.spyOn(window, 'open').mockReturnValue(null)
+      const selectElement = vi.fn()
+      useWorkspaceStore.setState({ selectElement } as never)
+      renderNode({ element: { documents: one } })
+      fireEvent.click(screen.getByLabelText('1 document for Payment API'))
+      expect(open).toHaveBeenCalledWith(
+        '/document-view?path=architecture%2Foverview.md&title=Overview', '_blank', 'noopener,noreferrer',
+      )
+      expect(selectElement).not.toHaveBeenCalled()
+    })
+
+    it('opens a menu listing titles for several documents, links open in a new tab, Escape closes', () => {
+      const open = vi.spyOn(window, 'open').mockReturnValue(null)
+      renderNode({ element: { documents: two } })
+      fireEvent.click(screen.getByLabelText('2 documents for Payment API'))
+      expect(open).not.toHaveBeenCalled()
+      const items = screen.getAllByRole('menuitem')
+      expect(items.map((i) => i.querySelector('.c4-doc-menu-title')?.textContent)).toEqual(['Overview', 'ADR 1'])
+      expect(items[1].getAttribute('href')).toBe('/document-view?path=adr%2F001.md&title=ADR+1')
+      expect(items[1].getAttribute('target')).toBe('_blank')
+      expect(items[1].getAttribute('rel')).toBe('noopener noreferrer')
+      fireEvent.keyDown(document, { key: 'Escape' })
+      expect(screen.queryByRole('menu')).toBeNull()
+    })
+
+    it('stays usable in the read-only viewer', () => {
+      useWorkspaceStore.setState({ readOnly: true })
+      const open = vi.spyOn(window, 'open').mockReturnValue(null)
+      renderNode({ element: { documents: one } })
+      fireEvent.click(screen.getByLabelText('1 document for Payment API'))
+      expect(open).toHaveBeenCalledTimes(1)
+      useWorkspaceStore.setState({ readOnly: false })
+    })
+  })
 })

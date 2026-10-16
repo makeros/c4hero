@@ -399,9 +399,27 @@ export class WorkspaceHelper {
     const targetBox = await target.boundingBox()
     if (!anchorBox || !targetBox) throw new Error('Could not get bounding boxes for reconnect drag')
 
+    // Drop on the node's handle facing the anchor, not on the node body: React
+    // Flow only connects when a handle lies within connectionRadius of the drop
+    // point, and a node's centre is out of range once the node is tall enough.
+    const anchorCenter = { x: anchorBox.x + anchorBox.width / 2, y: anchorBox.y + anchorBox.height / 2 }
+    const targetCenter = { x: targetBox.x + targetBox.width / 2, y: targetBox.y + targetBox.height / 2 }
+    const dx = anchorCenter.x - targetCenter.x
+    const dy = anchorCenter.y - targetCenter.y
+    const facing = Math.abs(dx) >= Math.abs(dy)
+      ? (dx >= 0 ? 'right' : 'left')
+      : (dy >= 0 ? 'bottom' : 'top')
+    const handleType = side === 'target' ? 'target' : 'source'
+
+    await target.hover()
+    const dropHandle = target.locator(`[data-handleid="${facing}-b-${handleType}"]`).first()
+    await dropHandle.waitFor({ state: 'attached' })
+    const dropBox = await dropHandle.boundingBox()
+    if (!dropBox) throw new Error('Could not get drop handle bounding box for reconnect drag')
+
     await this.dragBetweenCenters(
-      { x: anchorBox.x + anchorBox.width / 2, y: anchorBox.y + anchorBox.height / 2 },
-      { x: targetBox.x + targetBox.width / 2, y: targetBox.y + targetBox.height / 2 },
+      anchorCenter,
+      { x: dropBox.x + dropBox.width / 2, y: dropBox.y + dropBox.height / 2 },
     )
   }
 

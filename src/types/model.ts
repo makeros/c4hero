@@ -21,6 +21,12 @@ export function isLineStyle(v: string): v is LineStyle {
 
 // ─── Elements ────────────────────────────────────────────────────────
 
+/** A link to a local markdown document, stored project-root-relative. */
+export interface DocLink {
+  path: string
+  title: string
+}
+
 export interface BaseElement {
   id: string
   name: string
@@ -30,6 +36,7 @@ export interface BaseElement {
   url?: string
   status?: ElementStatus
   owner?: string
+  documents?: DocLink[]
 }
 
 export interface Person extends BaseElement {
@@ -130,6 +137,7 @@ export interface Relationship {
   url?: string
   tags: string[]
   properties: Record<string, string>
+  documents?: DocLink[]
 }
 
 // ─── Views ───────────────────────────────────────────────────────────

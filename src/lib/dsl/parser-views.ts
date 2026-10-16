@@ -352,6 +352,8 @@ function parseDynamicViewBody(p: ContextAwareParser, view: View, model: Model, o
         // 1, 2, 3, 2, 2). Duplicate orders across steps are therefore normal.
         if (token.type === 'LBRACE') {
             p.advance()
+            // Flattened into the surrounding sequence: the grouping is not modelled.
+            p.skipped.push({ line: token.line, text: '{ ... } (parallel steps)' })
             const base = order.next
             parseDynamicViewBody(p, view, model, order)
             p.skipNewlines()
@@ -385,6 +387,7 @@ function parseDynamicViewBody(p: ContextAwareParser, view: View, model: Model, o
             }
             if (kw === 'default') {
                 p.advance()
+                p.noteSkipped(p.pos - 1)
                 continue
             }
         }
@@ -567,6 +570,8 @@ function parseViewBody(p: ContextAwareParser, view: View, model: Model): void {
                     if (p.check('STAR')) { excluded.add(p.advance().value); continue }
                     const ref = p.readQualifiedRef({ allowString: true })
                     if (!ref) { p.advance(); continue }
+                    // `exclude "a -> b"` removes a relationship; only element ids are modelled.
+                    if (ref.ref.includes('->')) p.noteSkipped(p.pos - 1)
                     const resolvedId = p.resolveRef(ref.ref)
                     if (!resolvedId && ref.ref.includes('.')) {
                         p.addError(`Unresolved reference: '${ref.ref}'`, ref.token)
@@ -610,6 +615,7 @@ function parseViewBody(p: ContextAwareParser, view: View, model: Model): void {
 
             if (kw === 'default') {
                 p.advance()
+                p.noteSkipped(p.pos - 1)
                 continue
             }
 

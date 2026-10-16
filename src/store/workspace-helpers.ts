@@ -16,6 +16,25 @@ function deepCloneMaybeDraft<T>(value: T): T {
   return structuredClone(isDraft(value) ? (current(value as object) as T) : value)
 }
 
+/** Sequential renumber + membership recompute after any step edit.
+ *
+ *  Orders regenerate 1..n, which flattens parallel-sequence numbering — the
+ *  editor is a linear list, so an edit is the user restating the sequence as
+ *  linear. Membership is a projection of the steps (steps are all that
+ *  serializes), so elements whose last step died drop out here. */
+export function normalizeDynamicView(ws: Workspace, view: View): void {
+  view.relationships.forEach((step, i) => { step.order = String(i + 1) })
+  const endpoints = new Set<string>()
+  for (const step of view.relationships) {
+    const rel = ws.model.relationships.find(r => r.id === step.id)
+    const sourceId = step.sourceId ?? rel?.sourceId
+    const destId = step.destinationId ?? rel?.destinationId
+    if (sourceId) endpoints.add(sourceId)
+    if (destId) endpoints.add(destId)
+  }
+  view.elements = view.elements.filter(e => endpoints.has(e.id))
+}
+
 /** Fill view arrays and model collections that predate their introduction.
  *  Workspaces persisted (or crash-recovery-snapshotted) before dynamic and
  *  deployment views existed lack those arrays; every VIEW_ARRAY_KEYS loop and
@@ -100,7 +119,7 @@ export function invalidateElementIndex(ws: Workspace): void {
 }
 
 /** Patch shape that updateElement / updateElementLive both consume. */
-export type ElementPatch = Partial<Pick<ModelElement, 'name' | 'description' | 'tags' | 'status' | 'owner' | 'url'>>
+export type ElementPatch = Partial<Pick<ModelElement, 'name' | 'description' | 'tags' | 'status' | 'owner' | 'url' | 'documents'>>
   & { location?: 'Internal' | 'External' | 'Unspecified'; technology?: string }
 
 /** Apply a patch to an element in-place. Returns true only when the
@@ -123,6 +142,10 @@ export function applyElementPatch(ws: Workspace, id: string, patch: ElementPatch
     if ('status' in patch && el.status !== patch.status) { el.status = patch.status; changed = true }
     if ('owner' in patch && el.owner !== patch.owner) { el.owner = patch.owner; changed = true }
     if ('url' in patch && el.url !== patch.url) { el.url = patch.url; changed = true }
+    if ('documents' in patch && JSON.stringify(patch.documents) !== JSON.stringify(el.documents)) {
+      el.documents = patch.documents
+      changed = true
+    }
     if (patch.location !== undefined && (el.type === 'person' || el.type === 'softwareSystem')) {
       const cur = (el as Person | SoftwareSystem).location
       if (cur !== patch.location) { (el as Person | SoftwareSystem).location = patch.location; changed = true }

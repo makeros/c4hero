@@ -8,6 +8,7 @@ import type { ContextAwareParser } from './parser'
 import { nextId, MAX_DEPTH, setUserProperty } from './parser'
 import { parseRelationship } from './parser-relationship'
 import { parseDeploymentEnvironment } from './parser-deployment'
+import { parseDocumentsFromProperties } from './documentLinks'
 
 type Element = Person | SoftwareSystem | Container | Component
 
@@ -56,6 +57,11 @@ function applyStructurizrConventions(element: Element): void {
             delete element.properties['c4hero.status']
         }
     }
+    const { documents, rest } = parseDocumentsFromProperties(element.properties)
+    if (documents !== undefined) {
+        element.documents = documents
+    }
+    element.properties = rest
 }
 
 export function parseModelBody(
@@ -594,7 +600,10 @@ function parseSimpleElementBlock(p: ContextAwareParser, element: Person | Compon
             continue
         }
 
+        // Anything else (`-> x`, an identifier) is not modelled: record it so the
+        // lossy guard sees it instead of dropping it silently.
         p.advance()
+        p.skipUnknownDirective()
     }
 }
 

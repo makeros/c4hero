@@ -9,6 +9,7 @@ import {
   type EdgeProps,
 } from '@xyflow/react'
 import type { Relationship, RelationshipStyle } from '@/types/model'
+import DocumentIndicator from '../DocumentIndicator'
 import { useSettingsStore } from '@/store/settings'
 import { getEdgeLabelDensity, truncateEdgeLabel } from './relationshipEdgeLabels'
 
@@ -121,6 +122,9 @@ function RelationshipEdge({
         ? truncateEdgeLabel(effectiveDescription, COMPACT_DESCRIPTION_MAX_CHARS)
         : effectiveDescription)
     : undefined
+  const documents = relationship?.documents ?? []
+  const hasDocuments = documents.length > 0
+  const docSubject = effectiveDescription ?? 'relationship'
   const labelMaxWidth = labelDensity === 'compact' ? COMPACT_LABEL_MAX_WIDTH : FULL_LABEL_MAX_WIDTH
 
   return (
@@ -178,7 +182,7 @@ function RelationshipEdge({
         </EdgeLabelRenderer>
       )}
       {/* Label — shown when either description or technology is present */}
-      {(effectiveDescription || relationship?.technology) && (
+      {(effectiveDescription || relationship?.technology || hasDocuments) && (
         <EdgeLabelRenderer>
           <div
             className="nodrag nopan pointer-events-auto"
@@ -201,6 +205,8 @@ function RelationshipEdge({
               wordBreak: 'break-word',
             }}
           >
+            {(descriptionText || hasDocuments) && (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, maxWidth: '100%' }}>
             {descriptionText && (
               <span
                 className="text-[11px]"
@@ -214,6 +220,9 @@ function RelationshipEdge({
               >
                 {descriptionText}
               </span>
+            )}
+                {hasDocuments && <DocumentIndicator documents={documents} subject={docSubject} />}
+              </div>
             )}
             {technologyTokens.length > 0 && (
               <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', justifyContent: 'center', maxWidth: '100%', minWidth: 0 }}>

@@ -122,6 +122,17 @@ describe('element-slice readOnly guard', () => {
     expect(useWorkspaceStore.getState().undoStack).toHaveLength(0)
   })
 
+  it('moveElement is a no-op and returns false when readOnly', () => {
+    useWorkspaceStore.getState().setReadOnly(false)
+    const billing = useWorkspaceStore.getState().addSoftwareSystem('Billing')
+    useWorkspaceStore.setState({ undoStack: [] })
+    useWorkspaceStore.getState().setReadOnly(true)
+    const before = useWorkspaceStore.getState().workspace!
+    expect(useWorkspaceStore.getState().moveElement('web', billing)).toBe(false)
+    expect(useWorkspaceStore.getState().workspace).toBe(before)
+    expect(useWorkspaceStore.getState().undoStack).toHaveLength(0)
+  })
+
   it('all ten actions mutate normally when readOnly is false', () => {
     useWorkspaceStore.getState().setReadOnly(false)
 

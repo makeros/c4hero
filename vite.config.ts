@@ -1,12 +1,19 @@
 import { defineConfig } from 'vitest/config'
+import { createServer, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 import path from 'path'
 import { execSync } from 'child_process'
-import { readFileSync } from 'fs'
+import { docsRootFor, isInsideRootReal, listMarkdownFiles, resolveDocRequest } from './src/lib/docPath.ts'
+import { readFileSync, existsSync, statSync, readdirSync } from 'fs'
 
-const commitHash = execSync('git rev-parse --short HEAD').toString().trim()
+// Set by scripts/build-plugin.mjs: builds the headless export viewer into
+// plugins/c4hero/viewer/ (relative base, no PWA, no document collection, a
+// fixed commit label so consecutive builds are byte-identical).
+const exportBuild = process.env.C4HERO_EXPORT_BUILD === '1'
+
+const commitHash = exportBuild ? 'export' : execSync('git rev-parse --short HEAD').toString().trim()
 const appVersion = JSON.parse(readFileSync(path.resolve(__dirname, 'package.json'), 'utf8')).version
 
 // Virtual module that bakes a single workspace's DSL (and optional sidecar)
@@ -16,6 +23,24 @@ const appVersion = JSON.parse(readFileSync(path.resolve(__dirname, 'package.json
 // for how the env var gets set.
 const LOCKED_WORKSPACE_VIRTUAL_ID = 'virtual:locked-workspace'
 const LOCKED_WORKSPACE_RESOLVED_ID = '\0' + LOCKED_WORKSPACE_VIRTUAL_ID
+
+// Fixed mount point every environment fetches a `documents[].path` link's raw
+// markdown from (see specifications/document-links/document-links.plan.md's
+// "File resolution — one URL shape, three environments"). Dev and the prod
+// build are covered by the `document-links` plugin below; the locked viewer
+// build (`npm run build:viewer`) is a separate script/plugin pairing.
+const DOCS_MOUNT_PREFIX = '/__docs/'
+const DOCS_INDEX_NAME = '__index.json'
+
+// `closeBundle` runs after `tsc -b`'s separate pass, inside the already-
+// bundled `vite.config.ts` module — which means a plain `import` of
+// `src/lib/documentCollection.ts` here can't resolve its own `@/*` aliases or
+// extensionless `./dsl` import (Vite's config loader bundles this file with
+// plain Node module resolution, not the app's `resolve.alias`/bundler-mode
+// resolution). A short-lived, middleware-mode Vite dev server gives us that
+// same alias/extension resolution to `ssrLoadModule` the real
+// `planDocumentCopies` instead of reimplementing its DSL-parsing logic here.
+let resolvedOutDir = 'dist'
 
 export default defineConfig({
   plugins: [
@@ -55,7 +80,110 @@ export default defineConfig({
         return `export default ${JSON.stringify({ dsl, sidecar, name })}`
       },
     },
-    VitePWA({
+    ...(exportBuild ? [] : [{
+      name: 'document-links',
+      configResolved(config) {
+        resolvedOutDir = config.build.outDir
+      },
+      configureServer(server) {
+        // Document-link paths are relative to the workspace's project root
+        // (git root of the --workspace folder), not to this repo.
+        const devWorkspace = process.env.VITE_DEV_WORKSPACE_PATH
+        const docsRoot = devWorkspace ? docsRootFor(devWorkspace) : __dirname
+        server.middlewares.use((req, res, next) => {
+          if (!req.url || !req.url.startsWith(DOCS_MOUNT_PREFIX)) return next()
+
+          const encodedPath = req.url.slice(DOCS_MOUNT_PREFIX.length).split('?')[0]
+
+          // Markdown file list for wikilink resolution. Can't collide with a
+          // document: those must end in .md/.markdown.
+          if (encodedPath === DOCS_INDEX_NAME) {
+            res.statusCode = 200
+            res.setHeader('Content-Type', 'application/json; charset=utf-8')
+            res.end(JSON.stringify(listMarkdownFiles(docsRoot)))
+            return
+          }
+
+          let absolute: string
+          let rejected: boolean
+          try {
+            ;({ absolute, rejected } = resolveDocRequest(encodedPath, docsRoot))
+          } catch {
+            res.statusCode = 400
+            res.end('Bad request')
+            return
+          }
+
+          if (rejected) {
+            res.statusCode = 400
+            res.end('Bad request')
+            return
+          }
+
+          if (!existsSync(absolute) || !statSync(absolute).isFile()) {
+            res.statusCode = 404
+            res.end('Not found')
+            return
+          }
+
+          if (!isInsideRootReal(docsRoot, absolute)) {
+            res.statusCode = 400
+            res.end('Bad request')
+            return
+          }
+
+          res.statusCode = 200
+          res.setHeader('Content-Type', 'text/markdown; charset=utf-8')
+          res.end(readFileSync(absolute))
+        })
+      },
+      async closeBundle() {
+        // Optional: only set when `scripts/build-app.mjs` was invoked with
+        // `--workspace <dir>` — the bare `npm run build` every current
+        // deploy (Vercel, CI) runs leaves this unset, so collection is
+        // skipped entirely with no warning, matching today's build exactly.
+        const workspaceDir = process.env.DOCUMENT_WORKSPACE_DIR
+        if (!workspaceDir) return
+
+        const dslFilePaths = readdirSync(workspaceDir)
+          .filter((name) => name.toLowerCase().endsWith('.dsl'))
+          .map((name) => path.join(workspaceDir, name))
+
+        const server = await createServer({
+          configFile: false,
+          root: __dirname,
+          resolve: { alias: { '@': path.resolve(__dirname, 'src') } },
+          server: { middlewareMode: true, hmr: false },
+          optimizeDeps: { noDiscovery: true },
+          logLevel: 'error',
+        })
+
+        let plan: { copies: Array<{ from: string; to: string }>; missing: string[]; warnings: string[] }
+        let writeDocumentCopies: (plan: { copies: Array<{ from: string; to: string }> }, outDir: string) => void
+        try {
+          const collection = await server.ssrLoadModule('/src/lib/documentCollection.ts')
+          writeDocumentCopies = collection.writeDocumentCopies
+          plan = collection.planDocumentCopies(dslFilePaths, docsRootFor(workspaceDir))
+        } finally {
+          await server.close()
+        }
+
+        writeDocumentCopies(plan, path.resolve(__dirname, resolvedOutDir))
+        for (const missingPath of plan.missing) {
+          // Intentional: this is the plan's own Definition of Done ("logs a
+          // console.warn per missing file") for Task 3.2.
+          // eslint-disable-next-line no-console
+          console.warn(
+            `[document-links] referenced document not found (or resolves outside the project root), skipped: ${missingPath}`,
+          )
+        }
+        for (const warning of plan.warnings) {
+          // eslint-disable-next-line no-console
+          console.warn(`[document-links] ${warning}`)
+        }
+      },
+    } satisfies Plugin]),
+    ...(exportBuild ? [] : [VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['c4-logo.png', 'apple-touch-icon.png'],
       manifest: {
@@ -78,18 +206,22 @@ export default defineConfig({
         globIgnores: ['**/c4-logo.svg', '**/favicon.svg'],
       },
       devOptions: { enabled: false },
-    }),
+    })]),
   ],
   define: {
     __COMMIT_HASH__: JSON.stringify(commitHash),
     __APP_VERSION__: JSON.stringify(appVersion),
+    __EXPORT_MODE__: JSON.stringify(exportBuild),
   },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
     },
   },
+  base: exportBuild ? './' : '/',
+  publicDir: exportBuild ? false : 'public',
   build: {
+    ...(exportBuild ? { outDir: 'plugins/c4hero/viewer', emptyOutDir: true } : {}),
     rollupOptions: {
       output: {
         manualChunks(id: string) {

@@ -90,3 +90,36 @@ describe('RelationshipEdge density handling', () => {
     expect(screen.getAllByText('MutualTLSCertificatePinning').length).toBeGreaterThanOrEqual(1)
   })
 })
+
+describe('RelationshipEdge document indicator', () => {
+  const docs = [{ path: 'a.md', title: 'A' }, { path: 'b.md', title: 'B' }]
+  const edge = (rel: Record<string, unknown>) => render(
+    <svg>
+      <RelationshipEdge
+        id="edge-d" sourceX={0} sourceY={0} targetX={300} targetY={0}
+        sourcePosition={Position.Right} targetPosition={Position.Left}
+        selected={false} data={{ relationship: { ...relationship, ...rel } as never }}
+      />
+    </svg>,
+  )
+
+  it('renders no indicator without documents', () => {
+    edge({ description: 'Calls' })
+    expect(screen.queryByRole('button', { name: /document/i })).toBeNull()
+  })
+
+  it('renders inline with the description on a labelled edge, with count', () => {
+    edge({ description: 'Calls', technology: undefined, documents: docs })
+    const btn = screen.getByRole('button', { name: '2 documents for Calls' })
+    expect(btn.textContent).toBe('2')
+    expect(btn.parentElement?.textContent).toContain('Calls')
+  })
+
+  it('still renders on an unlabelled edge', () => {
+    edge({ description: undefined, technology: undefined, documents: [docs[0]] })
+    const open = vi.spyOn(window, 'open').mockReturnValue(null)
+    fireEvent.click(screen.getByRole('button', { name: '1 document for relationship' }))
+    expect(open).toHaveBeenCalledWith('/document-view?path=a.md&title=A', '_blank', 'noopener,noreferrer')
+    open.mockRestore()
+  })
+})

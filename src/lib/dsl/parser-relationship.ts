@@ -4,6 +4,7 @@ import type { Relationship } from '@/types/model'
 import { isInteractionStyle, isLineStyle } from '@/types/model'
 import type { ContextAwareParser } from './parser'
 import { setUserProperty } from './parser'
+import { parseDocumentsFromProperties } from './documentLinks'
 
 export function parseRelationship(p: ContextAwareParser): Relationship | null {
     // Both endpoints may be qualified paths (`mpng.gatewayApi`,
@@ -190,4 +191,9 @@ function applyRelationshipConventions(rel: Relationship): void {
         rel.interactionStyle = interactionStyle
         delete rel.properties['c4hero.interactionStyle']
     }
+    const { documents, rest } = parseDocumentsFromProperties(rel.properties)
+    if (documents !== undefined) {
+        rel.documents = documents
+    }
+    rel.properties = rest
 }
