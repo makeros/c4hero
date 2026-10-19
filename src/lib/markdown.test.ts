@@ -19,6 +19,21 @@ describe('renderMarkdownToSafeHtml', () => {
     expect(html).toContain('const x = 1')
   })
 
+  it('turns a mermaid code fence into a <pre class="mermaid"> with the raw diagram source', () => {
+    const html = renderMarkdownToSafeHtml('```mermaid\ngraph TD\nA --> B\n```')
+    const doc = new DOMParser().parseFromString(html, 'text/html')
+    const pre = doc.querySelector('pre.mermaid')
+    expect(pre).not.toBeNull()
+    expect(pre?.textContent).toBe('graph TD\nA --> B')
+    expect(doc.querySelector('code')).toBeNull()
+  })
+
+  it('leaves a non-mermaid fenced code block untouched', () => {
+    const html = renderMarkdownToSafeHtml('```js\nconst x = 1\n```')
+    expect(html).not.toContain('class="mermaid"')
+    expect(html).toContain('language-js')
+  })
+
   it('strips a raw <script> tag embedded in the source markdown', () => {
     const html = renderMarkdownToSafeHtml(
       '# Title\n\n<script>alert("xss")</script>\n\nSome text',

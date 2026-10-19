@@ -74,6 +74,18 @@ export function renderMarkdownToSafeHtml(
     if (s) h.id = HEADING_ID_PREFIX + s
   })
 
+  // ```mermaid fences become `<pre class="mermaid">` holding the raw diagram
+  // source as text — the shape mermaid.js's `run()` expects to find and
+  // replace with rendered SVG. That replacement needs a live DOM (it measures
+  // text to lay out the diagram), so it happens downstream in the consuming
+  // component, not here.
+  doc.querySelectorAll('pre > code.language-mermaid').forEach((code) => {
+    const mermaidPre = doc.createElement('pre')
+    mermaidPre.className = 'mermaid'
+    mermaidPre.textContent = code.textContent?.trim() ?? ''
+    code.parentElement?.replaceWith(mermaidPre)
+  })
+
   if (options) {
     doc.querySelectorAll('a[href]').forEach((a) => {
       const link = resolveDocLink(options.docPath, a.getAttribute('href') ?? '')

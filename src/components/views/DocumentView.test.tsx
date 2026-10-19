@@ -7,6 +7,12 @@ import { resetDocIndexCache } from '@/lib/docIndex'
 // Real routing (the global setup mocks useNavigate/useLocation).
 vi.mock('react-router-dom', async (importOriginal) => importOriginal())
 
+// jsdom doesn't implement the layout APIs (getBBox, etc.) mermaid needs to
+// actually render a diagram — these tests only need to verify DocumentView
+// hands it the right nodes, not that mermaid itself draws correctly.
+const { mermaidRun } = vi.hoisted(() => ({ mermaidRun: vi.fn().mockResolvedValue(undefined) }))
+vi.mock('mermaid', () => ({ default: { initialize: vi.fn(), run: mermaidRun } }))
+
 function res(init: { ok: boolean; status: number; text: () => Promise<string> }): Response {
   return init as unknown as Response
 }
@@ -18,6 +24,7 @@ function stubFetch(impl: () => unknown) {
 afterEach(() => {
   vi.unstubAllGlobals()
   resetDocIndexCache()
+  mermaidRun.mockClear()
 })
 
 describe('DocumentView', () => {
@@ -75,6 +82,38 @@ describe('DocumentView', () => {
 
     await waitFor(() => {
       expect(screen.getByText("Couldn't load document")).toBeTruthy()
+    })
+  })
+
+  describe('mermaid diagrams', () => {
+    it('hands mermaid.run() the diagram node from a ```mermaid fence', async () => {
+      stubFetch(() => res({ ok: true, status: 200, text: async () => '# Top\n\n```mermaid\ngraph TD\nA --> B\n```' }))
+
+      render(
+        <MemoryRouter initialEntries={['/document-view?path=docs/a.md&title=A']}>
+          <DocumentView />
+        </MemoryRouter>,
+      )
+
+      await screen.findByRole('heading', { name: 'Top' })
+      await waitFor(() => expect(mermaidRun).toHaveBeenCalledTimes(1))
+      const [{ nodes }] = mermaidRun.mock.calls[0]
+      expect(nodes).toHaveLength(1)
+      expect(nodes[0].className).toBe('mermaid')
+      expect(nodes[0].textContent).toBe('graph TD\nA --> B')
+    })
+
+    it('does not call mermaid.run() when the document has no mermaid fence', async () => {
+      stubFetch(() => res({ ok: true, status: 200, text: async () => '# Top\n\nSome text.' }))
+
+      render(
+        <MemoryRouter initialEntries={['/document-view?path=docs/a.md&title=A']}>
+          <DocumentView />
+        </MemoryRouter>,
+      )
+
+      await screen.findByRole('heading', { name: 'Top' })
+      expect(mermaidRun).not.toHaveBeenCalled()
     })
   })
 

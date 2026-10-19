@@ -1,9 +1,17 @@
 import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { FileWarning, FileX } from 'lucide-react'
+import mermaid from 'mermaid'
 import { renderMarkdownToSafeHtml } from '@/lib/markdown'
 import { HEADING_ID_PREFIX } from '@/lib/docLinks'
 import { fetchDocIndex } from '@/lib/docIndex'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('DocumentView')
+
+// c4hero's UI chrome is permanently dark (see index.css's `@theme`), so
+// mermaid's built-in dark theme is the only one that needs configuring.
+mermaid.initialize({ startOnLoad: false, theme: 'dark' })
 
 // Standalone page for a document link's target — opened in a new tab via
 // `/document-view?path=<project-root-relative .md path>&title=<label>`
@@ -61,6 +69,18 @@ export default function DocumentView() {
     if (loadedHtml === null) return
     if (!scrollToFragment(contentRef.current, hash.slice(1), false)) scrollRef.current?.scrollTo?.(0, 0)
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadedHtml])
+
+  // `renderMarkdownToSafeHtml` leaves mermaid fences as `<pre class="mermaid">`
+  // holding raw diagram source — rendering that to SVG needs a live DOM (mermaid
+  // measures text), so it happens here rather than in the string-based renderer.
+  useEffect(() => {
+    if (loadedHtml === null) return
+    const nodes = contentRef.current?.querySelectorAll<HTMLElement>('pre.mermaid')
+    if (!nodes || nodes.length === 0) return
+    mermaid.run({ nodes: Array.from(nodes) }).catch((err) => {
+      log.error('diagram render failed', { err })
+    })
   }, [loadedHtml])
 
   useEffect(() => {
@@ -234,6 +254,12 @@ export default function DocumentView() {
           overflow-x: auto;
         }
         .document-view-content pre code { background: none; padding: 0; }
+        .document-view-content pre.mermaid {
+          display: flex;
+          justify-content: center;
+          background: var(--color-surface-2);
+        }
+        .document-view-content pre.mermaid svg { max-width: 100%; }
         .document-view-content blockquote {
           border-left: 3px solid var(--color-border);
           margin: 1em 0;
