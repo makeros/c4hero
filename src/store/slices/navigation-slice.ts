@@ -35,9 +35,10 @@ export type NavigationSlice = Pick<WorkspaceState,
   | 'activeViewKey' | 'viewHistory'
   | 'pendingZoomConfirm' | 'createViewDefaults'
   | 'focusElementId' | 'clearFocusElement'
+  | 'focusRelationshipId' | 'clearFocusRelationship'
   | 'setActiveView' | 'drillInto' | 'zoomInto'
   | 'confirmZoomCreate' | 'cancelZoomConfirm' | 'openCreateViewFromZoom'
-  | 'setCreateViewDefaults' | 'navigateBack' | 'focusViewForElements'
+  | 'setCreateViewDefaults' | 'navigateBack' | 'focusViewForElements' | 'revealInView'
 >
 
 export const createNavigationSlice: StateCreator<
@@ -51,8 +52,10 @@ export const createNavigationSlice: StateCreator<
   pendingZoomConfirm: null,
   createViewDefaults: null,
   focusElementId: null,
+  focusRelationshipId: null,
 
   clearFocusElement: () => set({ focusElementId: null }),
+  clearFocusRelationship: () => set({ focusRelationshipId: null }),
 
   // After a batch (AI) apply that suppressed per-op view switching, navigate
   // ONCE to the view that best shows the newly-created elements. Prefer DEPTH:
@@ -186,5 +189,34 @@ export const createNavigationSlice: StateCreator<
     if (clearHighlightFiltersWithStash(s)) {
       announce('Highlighter cleared on view change')
     }
+  }),
+
+  // Used by the documents sidebar's view chips: switch to the view containing
+  // the item (if not already there), select it, and request a canvas focus so
+  // it's centered. Done in a single `set` so the view switch and the selection
+  // land in the same render — a separate call for each would risk another
+  // effect (route sync, canvas remount) clearing the selection in between.
+  revealInView: (viewKey, target) => set((s) => {
+    const changed = s.activeViewKey !== viewKey
+    if (changed) {
+      if (s.activeViewKey) s.viewHistory.push(s.activeViewKey)
+      s.activeViewKey = viewKey
+      clearSelectionDraft(s)
+      if (clearHighlightFiltersWithStash(s)) {
+        announce('Highlighter cleared on view change')
+      }
+    }
+    if (target.kind === 'element') {
+      s.selectedElementIds = [target.id]
+      s.selectedRelationshipId = null
+      s.focusElementId = target.id
+      s.focusRelationshipId = null
+    } else {
+      s.selectedRelationshipId = target.id
+      s.selectedElementIds = []
+      s.focusRelationshipId = target.id
+      s.focusElementId = null
+    }
+    s.selectedGroupId = null
   }),
 })

@@ -257,7 +257,9 @@ export default function BottomHighlighterBar() {
       aria-label="Highlighter"
       style={{
         position: 'fixed',
-        left: '50%',
+        // Centered over the canvas (not the full viewport) when the
+        // documents sidebar is docked open.
+        left: 'calc((100% - var(--docs-sidebar-w, 0px)) / 2)',
         bottom: 14,
         transform: 'translateX(-50%)',
         zIndex: 50,

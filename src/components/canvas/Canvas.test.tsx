@@ -608,6 +608,40 @@ describe('Canvas focus', () => {
       expect(useWorkspaceStore.getState().focusElementId).toBeNull()
     }, { timeout: 5000 })
   }, 10000)
+
+  it('offsets the centered x by half the inspector width when it is shown', async () => {
+    seed('cont')
+    await renderCanvas()
+    await screen.findByText('C1')
+    await wait(80) // let the initial fit settle before focusing
+
+    act(() => { useWorkspaceStore.setState({ focusElementId: 'c1' }) })
+    await waitFor(() => { expect(useWorkspaceStore.getState().focusElementId).toBeNull() })
+    await wait(400) // let the 300ms center animation finish
+    const withoutInspector = rf!.getViewport()
+
+    // Simulate the inspector panel being shown with a known rendered width —
+    // the global getBoundingClientRect stub above would otherwise report a
+    // fixed 800x600 for every element, so override it on this instance.
+    const inspector = document.createElement('div')
+    inspector.setAttribute('data-canvas-chrome', 'inspector')
+    Object.defineProperty(inspector, 'getBoundingClientRect', {
+      value: () => ({ width: 360, height: 400, top: 0, left: 0, right: 360, bottom: 400, x: 0, y: 0, toJSON: () => {} }),
+    })
+    document.body.appendChild(inspector)
+
+    act(() => { useWorkspaceStore.setState({ focusElementId: 'c1' }) })
+    await waitFor(() => { expect(useWorkspaceStore.getState().focusElementId).toBeNull() })
+    await wait(400)
+    const withInspector = rf!.getViewport()
+
+    document.body.removeChild(inspector)
+
+    // Centering the same target with the inspector showing shifts the
+    // viewport by exactly half the inspector's width (zoom cancels out of
+    // the math), independent of the actual zoom level.
+    expect(Math.abs(withInspector.x - withoutInspector.x)).toBeCloseTo(180, 0)
+  })
 })
 
 describe('Canvas viewport persistence', () => {

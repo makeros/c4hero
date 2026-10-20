@@ -77,12 +77,15 @@ function Hint({ id, children, onDismiss }: { id: string; children: React.ReactNo
 
   return (
     <div
-      className="absolute bottom-20 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 px-2 py-1 text-[11px] pointer-events-auto"
+      className="absolute bottom-20 z-20 flex -translate-x-1/2 items-center gap-2 px-2 py-1 text-[11px] pointer-events-auto"
       style={{
         color: 'var(--color-text-muted)',
         opacity: 0.55,
         background: 'transparent',
         animation: 'fadeIn 400ms ease',
+        // Centered over the canvas (not the full viewport) when the
+        // documents sidebar is docked open.
+        left: 'calc((100% - var(--docs-sidebar-w, 0px)) / 2)',
       }}
     >
       {children}

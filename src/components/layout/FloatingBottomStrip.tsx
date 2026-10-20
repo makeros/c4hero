@@ -466,7 +466,13 @@ function StyleField({ label, children }: { label: string; children: React.ReactN
 function ScopeViolationBanner({ violations }: { violations: ScopeViolation[] }) {
   return (
     <div style={{
-      position: 'fixed', bottom: 48, left: '50%', transform: 'translateX(-50%)', zIndex: 200,
+      position: 'fixed',
+      bottom: 48,
+      // Centered over the canvas (not the full viewport) when the documents
+      // sidebar is docked open.
+      left: 'calc((100% - var(--docs-sidebar-w, 0px)) / 2)',
+      transform: 'translateX(-50%)',
+      zIndex: 200,
       background: 'var(--color-tint-error)', border: '1px solid var(--color-border-error)',
       borderRadius: 10, padding: '8px 16px', fontSize: 12, color: 'var(--color-error-text)',
       display: 'flex', alignItems: 'center', gap: 8, maxWidth: 500, pointerEvents: 'auto',

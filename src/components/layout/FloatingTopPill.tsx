@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState, useCallback } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState, useCallback } from 'react'
 import { useReactFlow } from '@xyflow/react'
 import { useBreakpoint } from '@/hooks/useBreakpoint'
 import LoadingDot from '@/components/shared/LoadingDot'
@@ -24,8 +24,10 @@ import {
   FolderSymlink,
   LayoutGrid,
   Sparkles,
+  FileText,
 } from 'lucide-react'
 import { useSettingsStore } from '@/store/settings'
+import { countDocumentedItems } from '@/lib/documentIndex'
 
 import { listDSLFiles, readDSLFile, writeDSLFile, getCurrentDirHandle, slugifyName } from '@/lib/folderIO'
 import { parseDSL } from '@/lib/dsl'
@@ -61,6 +63,8 @@ export default function FloatingTopPill() {
   const iconListDialogOpen = useWorkspaceStore((s) => s.iconListDialogOpen)
   const setIconListDialogOpen = useWorkspaceStore((s) => s.setIconListDialogOpen)
   const showUndoRedo = useSettingsStore((s) => s.showUndoRedo)
+  const documentsSidebarOpen = useSettingsStore((s) => s.documentsSidebarOpen)
+  const documentCount = useMemo(() => (workspace ? countDocumentedItems(workspace) : 0), [workspace])
   const reactFlow = useReactFlow()
 
   const exportProposalDialogOpen = useWorkspaceStore((s) => s.exportProposalDialogOpen)
@@ -239,7 +243,9 @@ export default function FloatingTopPill() {
           position: 'fixed',
           top: 'max(14px, calc(env(safe-area-inset-top, 0px) + 8px))',
           left: 0,
-          right: 0,
+          // Stays centered over the canvas (not the full viewport) when the
+          // documents sidebar is docked open.
+          right: 'var(--docs-sidebar-w, 0px)',
           zIndex: 50,
           display: 'flex',
           justifyContent: 'center',
@@ -462,8 +468,6 @@ export default function FloatingTopPill() {
                 width: 40,
                 height: 44,
                 borderRadius: 0,
-                borderTopRightRadius: 'var(--radius-lg)',
-                borderBottomRightRadius: 'var(--radius-lg)',
                 minWidth: 40,
                 minHeight: 44,
               }}
@@ -474,6 +478,52 @@ export default function FloatingTopPill() {
               <Command size={15} />
             </button>
 
+            {/* Documents sidebar toggle — last button, carries the pill's right-edge rounding */}
+            <button
+              className="btn-icon"
+              data-active={documentsSidebarOpen ? 'true' : undefined}
+              data-documents-toggle
+              style={{
+                position: 'relative',
+                width: 40,
+                height: 44,
+                borderRadius: 0,
+                borderTopRightRadius: 'var(--radius-lg)',
+                borderBottomRightRadius: 'var(--radius-lg)',
+                minWidth: 40,
+                minHeight: 44,
+              }}
+              title="Documents (D)"
+              aria-label={documentCount > 0 ? `Documents (${documentCount})` : 'Documents'}
+              aria-pressed={documentsSidebarOpen}
+              onClick={() => useSettingsStore.getState().update({ documentsSidebarOpen: !useSettingsStore.getState().documentsSidebarOpen })}
+            >
+              <FileText size={15} />
+              {documentCount > 0 && (
+                <span
+                  aria-hidden="true"
+                  style={{
+                    position: 'absolute',
+                    top: 5,
+                    right: 5,
+                    minWidth: 14,
+                    height: 14,
+                    padding: '0 3px',
+                    borderRadius: 999,
+                    background: 'var(--color-accent)',
+                    color: 'var(--color-bg-primary)',
+                    fontSize: 9,
+                    fontWeight: 700,
+                    lineHeight: 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  {documentCount}
+                </span>
+              )}
+            </button>
 
           </>
         )}
@@ -515,6 +565,13 @@ export default function FloatingTopPill() {
               icon={Command}
               label="Command palette"
               onClick={() => { setHamburgerOpen(false); useWorkspaceStore.getState().setCommandPaletteOpen(true); setExportDialogOpen(false) }}
+            />
+            <div style={{ borderTop: '1px solid var(--color-border)', margin: '4px 0' }} />
+            <MenuItemRow
+              icon={FileText}
+              label={documentCount > 0 ? `Documents (${documentCount})` : 'Documents'}
+              pressed={documentsSidebarOpen}
+              onClick={() => { setHamburgerOpen(false); useSettingsStore.getState().update({ documentsSidebarOpen: !useSettingsStore.getState().documentsSidebarOpen }) }}
             />
             {showUndoRedo && !readOnly && (
               <>
@@ -611,7 +668,7 @@ export default function FloatingTopPill() {
         <div style={{
           position: 'fixed',
           bottom: 'max(72px, calc(env(safe-area-inset-bottom, 0px) + 72px))',
-          left: '50%',
+          left: 'calc((100% - var(--docs-sidebar-w, 0px)) / 2)',
           transform: 'translateX(-50%)',
           zIndex: 100,
           background: 'var(--glass-bg)',
@@ -823,11 +880,13 @@ function MenuItemRow({
   label,
   onClick,
   disabled,
+  pressed,
 }: {
   icon: React.ElementType
   label: string
   onClick: () => void
   disabled?: boolean
+  pressed?: boolean
 }) {
   return (
     <button
@@ -835,6 +894,7 @@ function MenuItemRow({
       className="flyout-item"
       onClick={onClick}
       disabled={disabled}
+      aria-pressed={pressed}
       style={{
         padding: '8px 12px',
         fontSize: 'var(--text-base)',

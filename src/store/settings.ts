@@ -32,7 +32,16 @@ export interface AppSettings {
    *  canvas regardless of its own per-relationship `lineStyle`. `undefined`
    *  ("Default") leaves each relationship's own style (or Curved) in effect. */
   globalLineStyle: LineStyle | undefined
+  /** Whether the documents sidebar is docked open on the right of the canvas. */
+  documentsSidebarOpen: boolean
+  /** Width in px of the documents sidebar, clamped to
+   *  [DOCUMENTS_SIDEBAR_MIN_WIDTH, DOCUMENTS_SIDEBAR_MAX_WIDTH]. */
+  documentsSidebarWidth: number
 }
+
+export const DOCUMENTS_SIDEBAR_MIN_WIDTH = 280
+export const DOCUMENTS_SIDEBAR_MAX_WIDTH = 640
+export const DOCUMENTS_SIDEBAR_DEFAULT_WIDTH = 340
 
 const DEFAULTS: AppSettings = {
   // Minimap is off by default; users can switch it to Auto/Always in canvas settings.
@@ -44,6 +53,8 @@ const DEFAULTS: AppSettings = {
   canvasGuideDismissed: false,
   alwaysExpandDetails: false,
   globalLineStyle: undefined,
+  documentsSidebarOpen: false,
+  documentsSidebarWidth: DOCUMENTS_SIDEBAR_DEFAULT_WIDTH,
 }
 
 const STORAGE_KEY = 'c4hero.json'
@@ -76,6 +87,17 @@ function readBoolean(source: Record<string, unknown>, key: keyof AppSettings, fa
   return typeof source[key] === 'boolean' ? source[key] : fallback
 }
 
+function clampSidebarWidth(value: number): number {
+  return Math.min(DOCUMENTS_SIDEBAR_MAX_WIDTH, Math.max(DOCUMENTS_SIDEBAR_MIN_WIDTH, value))
+}
+
+function readDocumentsSidebarWidth(source: Record<string, unknown>): number {
+  const value = source.documentsSidebarWidth
+  return typeof value === 'number' && Number.isFinite(value)
+    ? clampSidebarWidth(value)
+    : DEFAULTS.documentsSidebarWidth
+}
+
 function normalizeSettings(value: unknown): AppSettings {
   const source = isRecord(value) ? value : {}
   return {
@@ -89,6 +111,8 @@ function normalizeSettings(value: unknown): AppSettings {
     globalLineStyle: typeof source.globalLineStyle === 'string' && isLineStyle(source.globalLineStyle)
       ? source.globalLineStyle
       : DEFAULTS.globalLineStyle,
+    documentsSidebarOpen: readBoolean(source, 'documentsSidebarOpen', DEFAULTS.documentsSidebarOpen),
+    documentsSidebarWidth: readDocumentsSidebarWidth(source),
   }
 }
 

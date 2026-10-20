@@ -3,6 +3,7 @@ import { renderHook } from '@testing-library/react'
 import { useWorkspaceStore } from '@/store/workspace'
 import { useKeyboardShortcuts, shouldSuppressBackspaceNavigation } from './useKeyboardShortcuts'
 import { openDSLFile, saveDSLFile } from '@/lib/fileIO'
+import { useSettingsStore } from '@/store/settings'
 import type { Workspace } from '@/types/model'
 
 vi.mock('@xyflow/react', () => ({ useReactFlow: () => { throw new Error('not in flow') } }))
@@ -286,6 +287,25 @@ describe('useKeyboardShortcuts — global shortcut coverage', () => {
     expect(useWorkspaceStore.getState().highlighterOpenFacet).toBeNull()
   })
 
+  it('"d" toggles the documents sidebar setting on a canvas route', () => {
+    setup()
+    useSettingsStore.setState({ documentsSidebarOpen: false })
+    press('d')
+    expect(useSettingsStore.getState().documentsSidebarOpen).toBe(true)
+    press('d')
+    expect(useSettingsStore.getState().documentsSidebarOpen).toBe(false)
+  })
+
+  it('"d" is ignored while typing in an input', () => {
+    setup()
+    useSettingsStore.setState({ documentsSidebarOpen: false })
+    const input = document.createElement('input')
+    document.body.append(input)
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'd', bubbles: true }))
+    expect(useSettingsStore.getState().documentsSidebarOpen).toBe(false)
+    input.remove()
+  })
+
   it('"?" opens the command palette', () => {
     setup()
     press('?')
@@ -454,5 +474,13 @@ describe('useKeyboardShortcuts — readOnly guards mutating shortcuts', () => {
     const before = useWorkspaceStore.getState().layoutVersion
     press('l', { mod: true, shift: true })
     expect(useWorkspaceStore.getState().layoutVersion).toBe(before)
+  })
+
+  it('"d" (documents sidebar toggle) still works — navigation-only, not blocked', () => {
+    window.history.pushState({}, '', '/collection/team/diagram')
+    setup()
+    useSettingsStore.setState({ documentsSidebarOpen: false })
+    press('d')
+    expect(useSettingsStore.getState().documentsSidebarOpen).toBe(true)
   })
 })

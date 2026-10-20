@@ -48,6 +48,7 @@ export const createLifecycleSlice: StateCreator<
       selectedRelationshipId: null,
       selectedGroupId: null,
       focusElementId: null, // prevent stale scroll-to signal from a previous workspace
+      focusRelationshipId: null,
       // Close the assistant/settings so an open panel doesn't reopen off the
       // previous workspace when the next canvas mounts (App renders on these flags).
       aiPanelOpen: false,
@@ -80,6 +81,7 @@ export const createLifecycleSlice: StateCreator<
       selectedRelationshipId: null,
       selectedGroupId: null,
       focusElementId: null,
+      focusRelationshipId: null,
       aiPanelOpen: false,
       aiSettingsOpen: false,
       aiPanelFeature: null,

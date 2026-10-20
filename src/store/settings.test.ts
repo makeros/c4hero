@@ -1,5 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { useSettingsStore } from './settings'
+import {
+  useSettingsStore,
+  DOCUMENTS_SIDEBAR_MIN_WIDTH,
+  DOCUMENTS_SIDEBAR_MAX_WIDTH,
+  DOCUMENTS_SIDEBAR_DEFAULT_WIDTH,
+} from './settings'
 
 const STORAGE_KEY = 'c4hero.json'
 
@@ -12,6 +17,8 @@ const RESET_DEFAULTS = {
   colorTheme: 'readability' as const,
   canvasGuideDismissed: false,
   alwaysExpandDetails: false,
+  documentsSidebarOpen: false,
+  documentsSidebarWidth: DOCUMENTS_SIDEBAR_DEFAULT_WIDTH,
 }
 
 async function importFreshSettingsStore() {
@@ -53,6 +60,14 @@ describe('useSettingsStore', () => {
 
   it('has default alwaysExpandDetails false', () => {
     expect(useSettingsStore.getState().alwaysExpandDetails).toBe(false)
+  })
+
+  it('has default documentsSidebarOpen false', () => {
+    expect(useSettingsStore.getState().documentsSidebarOpen).toBe(false)
+  })
+
+  it('has default documentsSidebarWidth', () => {
+    expect(useSettingsStore.getState().documentsSidebarWidth).toBe(DOCUMENTS_SIDEBAR_DEFAULT_WIDTH)
   })
 
   it('update() changes a setting and persists it to localStorage', () => {
@@ -149,5 +164,37 @@ describe('useSettingsStore', () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(['not', 'settings']))
     const freshStore = await importFreshSettingsStore()
     expect(freshStore.getState()).toMatchObject(RESET_DEFAULTS)
+  })
+
+  describe('documents sidebar settings', () => {
+    it('update({documentsSidebarOpen:true}) persists and reloads', async () => {
+      useSettingsStore.getState().update({ documentsSidebarOpen: true })
+      expect(useSettingsStore.getState().documentsSidebarOpen).toBe(true)
+
+      const raw = localStorage.getItem(STORAGE_KEY)
+      expect(raw).not.toBeNull()
+      expect(JSON.parse(raw!).documentsSidebarOpen).toBe(true)
+
+      const freshStore = await importFreshSettingsStore()
+      expect(freshStore.getState().documentsSidebarOpen).toBe(true)
+    })
+
+    it('clamps documentsSidebarWidth to the minimum when persisted value is too small', async () => {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ documentsSidebarWidth: 10 }))
+      const freshStore = await importFreshSettingsStore()
+      expect(freshStore.getState().documentsSidebarWidth).toBe(DOCUMENTS_SIDEBAR_MIN_WIDTH)
+    })
+
+    it('clamps documentsSidebarWidth to the maximum when persisted value is too large', async () => {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ documentsSidebarWidth: 5000 }))
+      const freshStore = await importFreshSettingsStore()
+      expect(freshStore.getState().documentsSidebarWidth).toBe(DOCUMENTS_SIDEBAR_MAX_WIDTH)
+    })
+
+    it('falls back to the default width when the persisted value is not a number', async () => {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ documentsSidebarWidth: 'wide' }))
+      const freshStore = await importFreshSettingsStore()
+      expect(freshStore.getState().documentsSidebarWidth).toBe(DOCUMENTS_SIDEBAR_DEFAULT_WIDTH)
+    })
   })
 })

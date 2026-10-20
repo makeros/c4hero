@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, act } from '@testing-library/react'
 import { useWorkspaceStore, getAllViews } from '@/store/workspace'
 import { useSettingsStore } from '@/store/settings'
 import type { Workspace } from '@/types/model'
@@ -46,7 +46,7 @@ beforeEach(() => {
   localStorage.clear()
   useWorkspaceStore.getState().closeWorkspace()
   useWorkspaceStore.setState({ readOnly: false })
-  useSettingsStore.setState({ showUndoRedo: false })
+  useSettingsStore.setState({ showUndoRedo: false, documentsSidebarOpen: false })
 })
 
 describe('FloatingTopPill', () => {
@@ -152,5 +152,65 @@ describe('FloatingTopPill', () => {
     const ws = makeWs()
     useWorkspaceStore.getState().loadWorkspace(ws)
     expect(getAllViews(ws).map((v) => v.key)).toEqual(['overview', 'second'])
+  })
+
+  describe('documents sidebar toggle', () => {
+    it('toggles documentsSidebarOpen when clicked and is not active by default', () => {
+      useWorkspaceStore.getState().loadWorkspace(makeWs())
+      render(<FloatingTopPill />)
+      const btn = screen.getByLabelText('Documents')
+      expect(btn.getAttribute('data-active')).toBeNull()
+      fireEvent.click(btn)
+      expect(useSettingsStore.getState().documentsSidebarOpen).toBe(true)
+    })
+
+    it('shows data-active when the setting is already open, including read-only', () => {
+      useWorkspaceStore.getState().loadWorkspace(makeWs())
+      useWorkspaceStore.setState({ readOnly: true })
+      useSettingsStore.setState({ documentsSidebarOpen: true })
+      render(<FloatingTopPill />)
+      expect(screen.getByLabelText('Documents').getAttribute('data-active')).toBe('true')
+    })
+
+    it('toggles the setting when read-only', () => {
+      useWorkspaceStore.getState().loadWorkspace(makeWs())
+      useWorkspaceStore.setState({ readOnly: true })
+      useSettingsStore.setState({ documentsSidebarOpen: false })
+      render(<FloatingTopPill />)
+      fireEvent.click(screen.getByLabelText('Documents'))
+      expect(useSettingsStore.getState().documentsSidebarOpen).toBe(true)
+    })
+
+    it('exposes a Documents entry in the mobile hamburger menu that toggles the setting', () => {
+      setMobile(true)
+      useWorkspaceStore.getState().loadWorkspace(makeWs())
+      useSettingsStore.setState({ documentsSidebarOpen: false })
+      render(<FloatingTopPill />)
+      fireEvent.click(screen.getByLabelText('More actions'))
+      fireEvent.click(screen.getByText('Documents'))
+      expect(useSettingsStore.getState().documentsSidebarOpen).toBe(true)
+    })
+
+    it('exposes aria-pressed reflecting the open state', () => {
+      useWorkspaceStore.getState().loadWorkspace(makeWs())
+      useSettingsStore.setState({ documentsSidebarOpen: false })
+      render(<FloatingTopPill />)
+      const btn = screen.getByLabelText('Documents')
+      expect(btn.getAttribute('aria-pressed')).toBe('false')
+
+      act(() => { useSettingsStore.setState({ documentsSidebarOpen: true }) })
+      expect(screen.getByLabelText('Documents').getAttribute('aria-pressed')).toBe('true')
+    })
+
+    it('folds a non-zero document count into the aria-label while keeping the title fixed', () => {
+      const ws = makeWs()
+      ws.model.people[0].documents = [{ path: 'docs/alice.md', title: 'Alice doc' }]
+      useWorkspaceStore.getState().loadWorkspace(ws)
+      useSettingsStore.setState({ documentsSidebarOpen: false })
+      render(<FloatingTopPill />)
+
+      const btn = screen.getByLabelText('Documents (1)')
+      expect(btn.getAttribute('title')).toBe('Documents (D)')
+    })
   })
 })

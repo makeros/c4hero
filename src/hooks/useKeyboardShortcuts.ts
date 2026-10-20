@@ -11,6 +11,7 @@ import { fitContentNodesToViewport } from '@/lib/fitViewport'
 import { parseWorkspaceDocument } from '@/lib/workspaceDocument'
 import { isCanvasRoute } from '@/lib/routes'
 import { announce } from '@/lib/announce'
+import { useSettingsStore } from '@/store/settings'
 
 const log = createLogger('keyboard')
 
@@ -168,6 +169,14 @@ const GLOBAL_SHORTCUTS: Record<string, KeyHandler> = {
   },
   'h': (store) => {
     if (store.workspace) store.setHighlighterOpenFacet(store.highlighterOpenFacet ? null : 'tags')
+  },
+  'd': (store) => {
+    // Navigation-only toggle (persisted setting, not workspace state), gated
+    // to canvas routes like 'i' — stays enabled in read-only.
+    if (!store.workspace) return
+    if (!isCanvasRoute(window.location.pathname)) return
+    const open = useSettingsStore.getState().documentsSidebarOpen
+    useSettingsStore.getState().update({ documentsSidebarOpen: !open })
   },
   'm': (store) => {
     if (store.workspace) store.setMultiSelectMode(!store.multiSelectMode)

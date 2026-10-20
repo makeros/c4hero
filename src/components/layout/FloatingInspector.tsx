@@ -58,9 +58,9 @@ export default function FloatingInspector() {
         // Frame matched to the AI assistant panel so the two read as a set.
         position: 'fixed',
         top: 64,
-        right: 14,
+        right: 'calc(14px + var(--docs-sidebar-w, 0px))',
         zIndex: 50,
-        width: 'min(360px, calc(100vw - 28px))',
+        width: 'min(360px, calc(100vw - 28px - var(--docs-sidebar-w, 0px)))',
         maxHeight: 'calc(100dvh - 136px)',
         overflowY: 'auto',
         borderRadius: 12,

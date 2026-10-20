@@ -4,9 +4,10 @@ import {
   MousePointer, LayoutDashboard, Maximize2, ZoomIn, ZoomOut,
   LayoutGrid, Search, Save, Settings, Monitor,
   Presentation, FolderOpen, Image, FileCode, Copy, Plus,
-  Highlighter, MousePointerClick, RotateCcw, CircleHelp, Sparkles, Package, Shapes,
+  Highlighter, MousePointerClick, RotateCcw, CircleHelp, Sparkles, Package, Shapes, FileText,
 } from 'lucide-react'
 import { useWorkspaceStore, getCreatableTypes, getActiveView, getAllViews, isFocalScopeElement } from '@/store/workspace'
+import { useSettingsStore } from '@/store/settings'
 import { computeCascadeImpact } from '@/store/workspace-helpers'
 import { formatImpactSummary } from '@/lib/impactMessage'
 import { serializeDSL } from '@/lib/dsl'
@@ -280,6 +281,18 @@ export function getCommands(reactFlow: ReactFlowInstance | null): Command[] {
       icon: LayoutGrid,
       keywords: ['views', 'panel', 'sidebar'],
       execute: () => store().toggleViewsPanel(),
+    },
+    {
+      id: 'toggle-documents-sidebar',
+      label: 'Toggle Documents Sidebar',
+      category: 'view',
+      icon: FileText,
+      shortcut: 'D',
+      keywords: ['documents', 'docs', 'sidebar', 'panel', 'links'],
+      execute: () => {
+        const open = useSettingsStore.getState().documentsSidebarOpen
+        useSettingsStore.getState().update({ documentsSidebarOpen: !open })
+      },
     },
     {
       id: 'new-view',

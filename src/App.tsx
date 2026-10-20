@@ -11,6 +11,7 @@ import WhatsNewPill from '@/components/whatsnew/WhatsNewPill'
 import FloatingToolRail from '@/components/layout/FloatingToolRail'
 import FloatingViewsPanel from '@/components/layout/FloatingViewsPanel'
 import FloatingInspector from '@/components/layout/FloatingInspector'
+import DocumentsSidebar from '@/components/layout/DocumentsSidebar'
 import FloatingBottomStrip from '@/components/layout/FloatingBottomStrip'
 import BottomHighlighterBar from '@/components/layout/highlighter/BottomHighlighterBar'
 import FloatingZoomHud from '@/components/layout/FloatingZoomHud'
@@ -104,7 +105,7 @@ export default function App() {
     <ReactFlowProvider>
       <a href="#c4hero-canvas" className="sr-only">Skip to main content</a>
       <div style={{ position: 'fixed', inset: 0, background: 'var(--color-bg-primary)' }}>
-        <main id="c4hero-canvas" aria-label="Architecture diagram canvas" style={{ position: 'absolute', inset: 0 }}>
+        <main id="c4hero-canvas" aria-label="Architecture diagram canvas" style={{ position: 'absolute', inset: 0, right: 'var(--docs-sidebar-w, 0px)' }}>
           <ErrorBoundary label="Canvas error" onHome={() => useWorkspaceStore.getState().closeWorkspace()}>
             <Canvas />
           </ErrorBoundary>
@@ -115,6 +116,7 @@ export default function App() {
         <nav aria-label="Tools"><FloatingToolRail /></nav>
         <FloatingViewsPanel />
         <aside aria-label="Element inspector"><FloatingInspector /></aside>
+        <DocumentsSidebar />
         <BottomHighlighterBar />
         <FloatingBottomStrip />
         <FloatingZoomHud />

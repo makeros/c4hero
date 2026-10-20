@@ -17,7 +17,7 @@ export default function FloatingZoomHud() {
       style={{
         position: 'fixed',
         bottom: 'max(14px, calc(env(safe-area-inset-bottom, 0px) + 8px))',
-        right: 14,
+        right: 'calc(14px + var(--docs-sidebar-w, 0px))',
         zIndex: 50,
         display: 'flex',
         alignItems: 'center',

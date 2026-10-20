@@ -76,6 +76,10 @@ export interface WorkspaceState extends UndoState {
   // Focus request — set to an element ID to center the canvas on it, then cleared.
   focusElementId: string | null
   clearFocusElement: () => void
+  // Focus request — set to a relationship ID to center the canvas on its edge's
+  // midpoint, then cleared.
+  focusRelationshipId: string | null
+  clearFocusRelationship: () => void
 
   // Canvas settings
   activeTagFilter: string[]
@@ -130,6 +134,11 @@ export interface WorkspaceState extends UndoState {
   setCreateViewDefaults: (defaults: { type: ViewType; scopeId?: string } | null) => void
   navigateBack: () => void
   focusViewForElements: (ids: string[]) => void
+  /** Switch to `viewKey` (pushing the current view onto `viewHistory` if different,
+   *  with the same selection/highlighter-clearing side effects as `setActiveView`),
+   *  select `target` and set `focusElementId`/`focusRelationshipId` so the canvas
+   *  centers on it. Used by the documents sidebar's view chips. */
+  revealInView: (viewKey: string, target: { kind: 'element' | 'relationship'; id: string }) => void
 
   // Selection
   selectElements: (ids: string[]) => void

@@ -49,6 +49,17 @@ const edgeTypes: EdgeTypes = {
   relationship: RelationshipEdge,
 }
 
+/** Half the on-screen width the inspector currently occupies, in px, or 0
+ *  when it isn't shown. FloatingInspector renders its sized panel with
+ *  `data-canvas-chrome="inspector"` only while a selection is shown (it
+ *  unmounts otherwise), so an absent/zero-width match means "no inspector". */
+function getInspectorHalfWidthPx(): number {
+  const el = document.querySelector('[data-canvas-chrome="inspector"]')
+  if (!el) return 0
+  const { width } = el.getBoundingClientRect()
+  return width > 0 ? width / 2 : 0
+}
+
 const KBD_STYLE: React.CSSProperties = {
   padding: '2px 7px', borderRadius: 6,
   background: 'var(--glass-overlay-sm)', border: '1px solid var(--glass-overlay-md)',
@@ -683,24 +694,86 @@ export default function Canvas() {
     // focus only once we've acted (or exhausted attempts), not up front.
     let raf = 0
     let attempts = 0
+    let fitWaitAttempts = 0
     const run = () => {
+      // On a first visit to this view, a structural-change effect just kicked
+      // off the view's initial auto-fit (`fitPending`/`fitContentNodes`). If
+      // we center now, that fit lands a frame or two later and overrides this
+      // centering. Wait for it to settle first — bounded, so a fit that never
+      // completes can't stall this forever.
+      if (fitPending.current) {
+        if (fitWaitAttempts++ < 60) { raf = requestAnimationFrame(run); return }
+      }
       const node = reactFlowInstance.getNode(targetId)
       if (!node) {
         if (attempts++ < 60) { raf = requestAnimationFrame(run); return }
         clearFocusElement()
         return
       }
-      // Center on the element but keep the current zoom level.
+      // Center on the element but keep the current zoom level. When the
+      // inspector is open, shift the centered point so the target lands in
+      // the canvas area actually visible to the left of it, not behind it.
+      const zoom = reactFlowInstance.getZoom()
+      const offsetX = getInspectorHalfWidthPx() / zoom
       reactFlowInstance.setCenter(
-        node.position.x + (node.measured?.width ?? 200) / 2,
+        node.position.x + (node.measured?.width ?? 200) / 2 + offsetX,
         node.position.y + (node.measured?.height ?? 100) / 2,
-        { duration: 300, zoom: reactFlowInstance.getZoom() },
+        { duration: 300, zoom },
       )
       clearFocusElement()
     }
     raf = requestAnimationFrame(run)
     return () => cancelAnimationFrame(raf)
   }, [focusElementId, clearFocusElement, reactFlowInstance])
+
+  // Center view on a relationship revealed from the documents sidebar. Mirrors
+  // the focusElementId effect above but centers on the edge's midpoint.
+  const focusRelationshipId = useWorkspaceStore((s) => s.focusRelationshipId)
+  const clearFocusRelationship = useWorkspaceStore((s) => s.clearFocusRelationship)
+  useEffect(() => {
+    if (!focusRelationshipId) return
+    const targetId = focusRelationshipId
+    let raf = 0
+    let attempts = 0
+    let fitWaitAttempts = 0
+    const run = () => {
+      // See the matching comment in the focusElementId effect above: wait for
+      // a view's pending initial fit to settle before centering, or it gets
+      // overridden a frame or two later.
+      if (fitPending.current) {
+        if (fitWaitAttempts++ < 60) { raf = requestAnimationFrame(run); return }
+      }
+      // Edge ids may be `${rel.id}#${step}` in dynamic views — match on the
+      // backing relationship, not the edge id (same as the selection-reconcile
+      // effect above).
+      const edge = reactFlowInstance.getEdges().find(
+        (e) => (e.data as { relationship?: { id: string } } | undefined)?.relationship?.id === targetId,
+      )
+      const sourceNode = edge ? reactFlowInstance.getNode(edge.source) : undefined
+      const targetNode = edge ? reactFlowInstance.getNode(edge.target) : undefined
+      if (!edge || !sourceNode || !targetNode) {
+        if (attempts++ < 60) { raf = requestAnimationFrame(run); return }
+        clearFocusRelationship()
+        return
+      }
+      const midX = (
+        sourceNode.position.x + (sourceNode.measured?.width ?? 200) / 2 +
+        targetNode.position.x + (targetNode.measured?.width ?? 200) / 2
+      ) / 2
+      const midY = (
+        sourceNode.position.y + (sourceNode.measured?.height ?? 100) / 2 +
+        targetNode.position.y + (targetNode.measured?.height ?? 100) / 2
+      ) / 2
+      // Same visible-area offset as the element focus effect when the
+      // inspector is open.
+      const zoom = reactFlowInstance.getZoom()
+      const offsetX = getInspectorHalfWidthPx() / zoom
+      reactFlowInstance.setCenter(midX + offsetX, midY, { duration: 300, zoom })
+      clearFocusRelationship()
+    }
+    raf = requestAnimationFrame(run)
+    return () => cancelAnimationFrame(raf)
+  }, [focusRelationshipId, clearFocusRelationship, reactFlowInstance])
 
   // Suppress inspector opening during drag (works on touch too).
   // onSelectionChange fires at touch-start before any movement, so we schedule
