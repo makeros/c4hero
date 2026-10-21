@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, useLocation } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import DocumentView from './DocumentView'
@@ -12,6 +12,20 @@ vi.mock('react-router-dom', async (importOriginal) => importOriginal())
 // hands it the right nodes, not that mermaid itself draws correctly.
 const { mermaidRun } = vi.hoisted(() => ({ mermaidRun: vi.fn().mockResolvedValue(undefined) }))
 vi.mock('mermaid', () => ({ default: { initialize: vi.fn(), run: mermaidRun } }))
+
+// Captures the live-reload subscriber so tests can play dev-server events.
+const { docChangeListeners } = vi.hoisted(() => ({
+  docChangeListeners: new Set<(change: { path: string; kind: 'change' | 'add' | 'unlink' }) => void>(),
+}))
+vi.mock('@/lib/docLiveReload', () => ({
+  onDocChange: (cb: (change: { path: string; kind: 'change' | 'add' | 'unlink' }) => void) => {
+    docChangeListeners.add(cb)
+    return () => docChangeListeners.delete(cb)
+  },
+}))
+function emitDocChange(path: string, kind: 'change' | 'add' | 'unlink' = 'change') {
+  act(() => docChangeListeners.forEach((cb) => cb({ path, kind })))
+}
 
 function res(init: { ok: boolean; status: number; text: () => Promise<string> }): Response {
   return init as unknown as Response
@@ -215,6 +229,64 @@ describe('DocumentView', () => {
       )
       fireEvent.click(await screen.findByRole('link', { name: 'up' }))
       await screen.findByText('Document not found')
+    })
+  })
+
+  describe('live reload', () => {
+    function mountWithBody(body: { current: string }, files: string[] = ['docs/a.md']) {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async (url: string) =>
+          url === '/__docs/__index.json'
+            ? res({ ok: true, status: 200, text: async () => JSON.stringify({ files }) })
+            : res({ ok: true, status: 200, text: async () => body.current }),
+        ),
+      )
+      return render(
+        <MemoryRouter initialEntries={['/document-view?path=docs/a.md&title=A']}>
+          <DocumentView />
+        </MemoryRouter>,
+      )
+    }
+    const docFetches = () => vi.mocked(fetch).mock.calls.filter(([u]) => u === '/__docs/docs/a.md').length
+    const indexFetches = () => vi.mocked(fetch).mock.calls.filter(([u]) => u === '/__docs/__index.json').length
+
+    it('refetches the open document in place when it changes, keeping the scroll position', async () => {
+      const body = { current: '# First' }
+      const { container } = mountWithBody(body)
+      await screen.findByRole('heading', { name: 'First' })
+      const scroller = container.firstElementChild as HTMLElement
+      const scrollTo = vi.fn()
+      scroller.scrollTo = scrollTo
+
+      body.current = '# Second'
+      emitDocChange('docs/a.md')
+
+      await screen.findByRole('heading', { name: 'Second' })
+      expect(screen.queryByText('Loading…')).toBeNull()
+      expect(scrollTo).not.toHaveBeenCalled()
+      expect(indexFetches()).toBe(1)
+    })
+
+    it('ignores edits to other documents', async () => {
+      mountWithBody({ current: '# First' })
+      await screen.findByRole('heading', { name: 'First' })
+      emitDocChange('docs/other.md')
+      await new Promise((r) => setTimeout(r, 0))
+      expect(docFetches()).toBe(1)
+    })
+
+    it('re-resolves wikilinks against a fresh index when a document is added', async () => {
+      const files = ['docs/a.md']
+      mountWithBody({ current: 'See [[Cloud]].' }, files)
+      const before = await screen.findByRole('link', { name: 'Cloud' })
+      expect(before.className).toBe('doc-link-unresolved')
+
+      files.push('std/Cloud.md')
+      emitDocChange('std/Cloud.md', 'add')
+
+      await waitFor(() => expect(screen.getByRole('link', { name: 'Cloud' }).className).toBe(''))
+      expect(indexFetches()).toBe(2)
     })
   })
 })

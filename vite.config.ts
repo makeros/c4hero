@@ -5,7 +5,8 @@ import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 import path from 'path'
 import { execSync } from 'child_process'
-import { docsRootFor, isInsideRootReal, listMarkdownFiles, resolveDocRequest } from './src/lib/docPath.ts'
+import { docRelativePath, docsRootFor, isInsideRootReal, listMarkdownFiles, resolveDocRequest } from './src/lib/docPath.ts'
+import { DOC_CHANGED_EVENT, type DocChange } from './src/lib/docLiveReload.ts'
 import { readFileSync, existsSync, statSync, readdirSync } from 'fs'
 
 // Set by scripts/build-plugin.mjs: builds the headless export viewer into
@@ -90,6 +91,21 @@ export default defineConfig({
         // (git root of the --workspace folder), not to this repo.
         const devWorkspace = process.env.VITE_DEV_WORKSPACE_PATH
         const docsRoot = devWorkspace ? docsRootFor(devWorkspace) : __dirname
+
+        // Documents are served raw, outside the module graph, so HMR never
+        // sees them — push a custom event instead (see src/lib/docLiveReload.ts).
+        // The docs root usually lies outside Vite's root, hence the explicit
+        // add; Vite's default `ignored` still skips .git and node_modules.
+        server.watcher.add(docsRoot)
+        const notifyDocChange = (kind: DocChange['kind']) => (file: string) => {
+          const docPath = docRelativePath(docsRoot, file)
+          if (!docPath) return
+          server.ws.send({ type: 'custom', event: DOC_CHANGED_EVENT, data: { path: docPath, kind } satisfies DocChange })
+        }
+        server.watcher.on('change', notifyDocChange('change'))
+        server.watcher.on('add', notifyDocChange('add'))
+        server.watcher.on('unlink', notifyDocChange('unlink'))
+
         server.middlewares.use((req, res, next) => {
           if (!req.url || !req.url.startsWith(DOCS_MOUNT_PREFIX)) return next()
 

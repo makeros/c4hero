@@ -3,7 +3,23 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSyn
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { docPathProblem, docsRootFor, isInsideRoot, isInsideRootReal, listMarkdownFiles, resolveDocRequest } from './docPath'
+import { docPathProblem, docRelativePath, docsRootFor, isInsideRoot, isInsideRootReal, listMarkdownFiles, resolveDocRequest } from './docPath'
+
+describe('docRelativePath', () => {
+  const root = path.resolve('/repo')
+  it('returns the root-relative POSIX path of a markdown file under the root', () => {
+    expect(docRelativePath(root, path.join(root, 'docs', 'a.md'))).toBe('docs/a.md')
+    expect(docRelativePath(root, path.join(root, 'B.MARKDOWN'))).toBe('B.MARKDOWN')
+  })
+  it.each([
+    ['outside the root', path.resolve('/elsewhere/a.md')],
+    ['a sibling with the root as name prefix', path.resolve('/repo-other/a.md')],
+    ['a non-markdown file', path.join(root, 'src', 'a.ts')],
+    ['a hidden segment', path.join(root, '.github', 'a.md')],
+    ['node_modules', path.join(root, 'node_modules', 'pkg', 'README.md')],
+    ['the root itself', root],
+  ])('rejects %s', (_label, file) => expect(docRelativePath(root, file)).toBeNull())
+})
 
 describe('docPathProblem', () => {
   it('accepts relative markdown paths', () => {

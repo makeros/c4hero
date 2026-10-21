@@ -4,7 +4,8 @@ import { FileWarning, FileX } from 'lucide-react'
 import mermaid from 'mermaid'
 import { renderMarkdownToSafeHtml } from '@/lib/markdown'
 import { HEADING_ID_PREFIX } from '@/lib/docLinks'
-import { fetchDocIndex } from '@/lib/docIndex'
+import { fetchDocIndex, resetDocIndexCache } from '@/lib/docIndex'
+import { onDocChange } from '@/lib/docLiveReload'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('DocumentView')
@@ -62,11 +63,24 @@ export default function DocumentView() {
     fetched.status !== 'loading' && fetched.path !== path ? { status: 'loading' } : fetched
   const loadedHtml = state.status === 'loaded' ? state.html : null
 
+  // Bumped by dev-server live reload to refetch the current document in
+  // place: the settled state keeps its path, so no loading screen flashes.
+  const [revision, setRevision] = useState(0)
+  useEffect(() => onDocChange(({ path: changed, kind }) => {
+    // Adds and removals change wikilink resolution, so they re-render the
+    // open document too, against a fresh index.
+    if (kind !== 'change') resetDocIndexCache()
+    if (kind !== 'change' || changed === path) setRevision((r) => r + 1)
+  }), [path])
+
   // After a document renders: jump to its `#fragment` heading, else to the top.
   // `hash` is read here but intentionally not a dependency — in-page anchor
-  // clicks scroll themselves (smoothly); this only runs once per load.
+  // clicks scroll themselves (smoothly); this only runs once per document, so
+  // a live reload keeps the reader's scroll position.
+  const scrolledPathRef = useRef<string | null>(null)
   useEffect(() => {
-    if (loadedHtml === null) return
+    if (loadedHtml === null || scrolledPathRef.current === path) return
+    scrolledPathRef.current = path
     if (!scrollToFragment(contentRef.current, hash.slice(1), false)) scrollRef.current?.scrollTo?.(0, 0)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadedHtml])
@@ -131,7 +145,7 @@ export default function DocumentView() {
     return () => {
       cancelled = true
     }
-  }, [path])
+  }, [path, revision])
 
   if (!path) {
     return (

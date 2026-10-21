@@ -3,7 +3,7 @@
 // (node:path / node:fs only) so Vite config, the CLI and the app build share
 // one implementation.
 import { existsSync, readdirSync, realpathSync, statSync } from 'node:fs'
-import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 
 const MARKDOWN_EXTENSIONS = ['.md', '.markdown']
 
@@ -78,6 +78,17 @@ export function resolveDocRequest(
   const absolute = resolve(root, decoded)
   const rejected = !hasMarkdownExtension(decoded) || hasHiddenSegment(decoded) || !isInsideRoot(root, absolute)
   return { absolute, rejected }
+}
+
+/** Root-relative POSIX path of `file` when it's a document `listMarkdownFiles`
+ *  would list (markdown, inside `root`, no hidden segment or `node_modules`),
+ *  else null. Textual only — `file` may already be deleted. */
+export function docRelativePath(root: string, file: string): string | null {
+  const rel = relative(resolve(root), resolve(file))
+  if (rel === '' || rel.startsWith('..') || isAbsolute(rel)) return null
+  const posix = rel.split(sep).join('/')
+  if (!hasMarkdownExtension(posix) || hasHiddenSegment(posix) || posix.split('/').includes('node_modules')) return null
+  return posix
 }
 
 /** Root-relative POSIX paths of every markdown file under `root` (names sorted per folder).
