@@ -5,6 +5,7 @@ import { parseDSL } from '../../src/lib/dsl'
 type MemoryFsWindow = Window & {
   __c4heroMemoryFs?: {
     getFileContent(path: string): string | null
+    setFileContent(path: string, content: string): void
   }
 }
 
@@ -161,12 +162,21 @@ async function installMemoryFileSystem(page: Page) {
       return file?.content ?? null
     }
 
+    // An edit by another program (editor, CLI, git) to an existing file.
+    function setFileContent(path: string, content: string) {
+      const parts = path.split('/').filter(Boolean)
+      let current = root
+      for (const part of parts.slice(0, -1)) current = current.directories[part]
+      const name = parts[parts.length - 1]
+      current.files[name] = { kind: 'file', name, content, lastModified: Date.now() }
+    }
+
     Object.defineProperty(window, 'showDirectoryPicker', {
       configurable: true,
       value: async () => root,
     })
 
-    ;(window as MemoryFsWindow).__c4heroMemoryFs = { getFileContent }
+    ;(window as MemoryFsWindow).__c4heroMemoryFs = { getFileContent, setFileContent }
   })
 }
 
@@ -382,5 +392,33 @@ test.describe('Collection workspace canvas DSL journey', () => {
       { source: 'Shopper', destination: workspaceName, description: 'Places orders', technology: 'HTTPS' },
       { source: 'Web App', destination: 'Order API', description: 'Calls order APIs', technology: 'JSON/HTTPS' },
     ]))
+  })
+
+  test('reloads the canvas when the workspace DSL is edited outside the app', async ({ workspace }) => {
+    const page = workspace.page
+    const dslPath = 'live-reload/live-reload.dsl'
+
+    await installMemoryFileSystem(page)
+    await workspace.goto()
+
+    await page.getByRole('button', { name: /New collection/ }).click()
+    await page.locator('input:not([type="file"])').first().fill('Live Reload')
+    await page.getByRole('button', { name: /Choose location/ }).click()
+    await page.getByRole('button', { name: /New Workspace/ }).first().click()
+    await page.locator('input:not([type="file"]):not([type="checkbox"])').first().fill('Live Reload')
+    await page.getByRole('button', { name: 'Create Workspace' }).click()
+    await page.locator('.react-flow').waitFor({ state: 'visible' })
+    await expect(workspace.getVisibleNodeByName('New System')).toBeVisible()
+
+    await expect.poll(() => readMemoryFile(page, dslPath)).toContain('"New System"')
+    const edited = (await readMemoryFile(page, dslPath))!.replace('"New System"', '"Renamed Outside"')
+    await page.evaluate(([path, content]) => {
+      (window as MemoryFsWindow).__c4heroMemoryFs?.setFileContent(path, content)
+    }, [dslPath, edited] as const)
+
+    await expect(workspace.getVisibleNodeByName('Renamed Outside')).toBeVisible({ timeout: 5000 })
+    // Autosave must not rewrite the externally edited file on reload.
+    await page.waitForTimeout(2500)
+    expect(await readMemoryFile(page, dslPath)).toBe(edited)
   })
 })

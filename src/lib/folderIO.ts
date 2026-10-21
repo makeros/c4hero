@@ -80,28 +80,86 @@ export async function openFolder(): Promise<{ dirHandle: FileSystemDirectoryHand
   }
 }
 
+// ─── External-change tracking ─────────────────────────────────────────
+// The text this tab last read or wrote per file (DSL and sidecar alike, a
+// missing sidecar as ''), so `readDSLFileIfChanged` can tell another
+// program's edit from this tab's own autosave. A read that overlaps one of
+// our writes can't be trusted either way, hence the generation counter.
+
+const knownText = new Map<string, string>()
+let writesInFlight = 0
+let writeGeneration = 0
+
+async function readDSLPair(dir: FileSystemDirectoryHandle, filename: string): Promise<{ content: string; sidecarJson?: string }> {
+  const fileHandle = await dir.getFileHandle(filename)
+  const file = await fileHandle.getFile()
+  const content = await readTextFileWithLimit(file, 'DSL file')
+
+  let sidecarJson: string | undefined
+  try {
+    const sidecarFilename = sidecarName(filename)
+    const sidecarHandle = await dir.getFileHandle(sidecarFilename)
+    const sidecarFile = await sidecarHandle.getFile()
+    sidecarJson = await readTextFileWithLimit(sidecarFile, 'Sidecar file')
+  } catch {
+    // No sidecar — expected for new workspaces
+  }
+
+  return { content, sidecarJson }
+}
+
+function rememberPair(filename: string, pair: { content: string; sidecarJson?: string }): void {
+  knownText.set(filename, pair.content)
+  knownText.set(sidecarName(filename), pair.sidecarJson ?? '')
+}
+
 /** Read a .dsl file and its matching .c4hero.json sidecar from the current directory */
 export async function readDSLFile(filename: string): Promise<{ content: string; sidecarJson?: string } | null> {
   if (!currentDirHandle) return null
   try {
-    const fileHandle = await currentDirHandle.getFileHandle(filename)
-    const file = await fileHandle.getFile()
-    const content = await readTextFileWithLimit(file, 'DSL file')
-
-    let sidecarJson: string | undefined
-    try {
-      const sidecarFilename = sidecarName(filename)
-      const sidecarHandle = await currentDirHandle.getFileHandle(sidecarFilename)
-      const sidecarFile = await sidecarHandle.getFile()
-      sidecarJson = await readTextFileWithLimit(sidecarFile, 'Sidecar file')
-    } catch {
-      // No sidecar — expected for new workspaces
-    }
-
-    return { content, sidecarJson }
+    const pair = await readDSLPair(currentDirHandle, filename)
+    rememberPair(filename, pair)
+    return pair
   } catch (err) {
     log.warn('readDSLFile failed', err)
     return null
+  }
+}
+
+/** Like `readDSLFile`, but only returns the pair when the DSL or its sidecar
+ *  differs from what this tab last read or wrote — i.e. something else edited
+ *  them. Null when unchanged, unreadable, or overlapping one of our writes. */
+export async function readDSLFileIfChanged(filename: string): Promise<{ content: string; sidecarJson?: string } | null> {
+  if (!currentDirHandle || writesInFlight > 0) return null
+  const generation = writeGeneration
+  let pair: { content: string; sidecarJson?: string }
+  try {
+    pair = await readDSLPair(currentDirHandle, filename)
+  } catch {
+    return null // deleted or renamed mid-session — nothing to reload
+  }
+  if (writesInFlight > 0 || generation !== writeGeneration) return null
+  // A file this tab never read or wrote (e.g. the sidecar of a workspace
+  // created in-app) has no baseline yet — record one rather than reporting it.
+  const differs = (key: string, text: string) => knownText.has(key) && knownText.get(key) !== text
+  const changed = differs(filename, pair.content) || differs(sidecarName(filename), pair.sidecarJson ?? '')
+  rememberPair(filename, pair)
+  return changed ? pair : null
+}
+
+async function writeTrackedFile(filename: string, content: string): Promise<void> {
+  if (!currentDirHandle) throw new Error('No folder open')
+  writesInFlight++
+  writeGeneration++
+  try {
+    const fileHandle = await currentDirHandle.getFileHandle(filename, { create: true })
+    const writable = await fileHandle.createWritable()
+    await writable.write(content)
+    await writable.close()
+    knownText.set(filename, content)
+  } finally {
+    writesInFlight--
+    writeGeneration++
   }
 }
 
@@ -109,10 +167,7 @@ export async function readDSLFile(filename: string): Promise<{ content: string; 
 export async function writeDSLFile(filename: string, content: string): Promise<boolean> {
   if (!currentDirHandle) return false
   try {
-    const fileHandle = await currentDirHandle.getFileHandle(filename, { create: true })
-    const writable = await fileHandle.createWritable()
-    await writable.write(content)
-    await writable.close()
+    await writeTrackedFile(filename, content)
     return true
   } catch (err) {
     log.error('writeDSLFile failed', err)
@@ -124,11 +179,7 @@ export async function writeDSLFile(filename: string, content: string): Promise<b
 export async function writeSidecarFile(dslFilename: string, json: string): Promise<boolean> {
   if (!currentDirHandle) return false
   try {
-    const filename = sidecarName(dslFilename)
-    const fileHandle = await currentDirHandle.getFileHandle(filename, { create: true })
-    const writable = await fileHandle.createWritable()
-    await writable.write(json)
-    await writable.close()
+    await writeTrackedFile(sidecarName(dslFilename), json)
     return true
   } catch (err) {
     log.error('writeSidecarFile failed', err)

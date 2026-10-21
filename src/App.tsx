@@ -5,6 +5,7 @@ import { ReactFlowProvider, useReactFlow } from '@xyflow/react'
 import { useWorkspaceStore } from '@/store/workspace'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
 import { useAutoSave } from '@/hooks/useAutoSave'
+import { useExternalFileReload } from '@/hooks/useExternalFileReload'
 import { useRouteSync, useRefreshRedirect } from '@/hooks/useRouteSync'
 import FloatingTopPill from '@/components/layout/FloatingTopPill'
 import WhatsNewPill from '@/components/whatsnew/WhatsNewPill'
@@ -50,6 +51,7 @@ export default function App() {
 
   useKeyboardShortcuts()
   useAutoSave()
+  useExternalFileReload()
   useRouteSync()
   useRefreshRedirect()
 

@@ -3,6 +3,7 @@ import {
   hasFolderAccess,
   openFolder,
   readDSLFile,
+  readDSLFileIfChanged,
   writeDSLFile,
   writeSidecarFile,
   listDSLFiles,
@@ -426,3 +427,131 @@ function makeIDBMock(idbStore: Record<string, unknown>) {
     },
   }
 }
+
+// ─── readDSLFileIfChanged ────────────────────────────────────────────
+
+describe('readDSLFileIfChanged()', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  // Files live in a mutable map so tests can edit them "externally" and
+  // observe this tab's own writes. `beforeClose` runs mid-write.
+  function makeMutableDir(files: Record<string, string>, hooks: { beforeClose?: () => Promise<void> } = {}) {
+    const handleFor = (name: string) => ({
+      kind: 'file' as const,
+      name,
+      getFile: async () => new File([files[name]], name),
+      createWritable: async () => {
+        let pending = ''
+        return {
+          write: async (d: string) => { pending += d },
+          close: async () => {
+            await hooks.beforeClose?.()
+            files[name] = pending
+          },
+        }
+      },
+    })
+    return {
+      kind: 'directory',
+      name: 'mutable',
+      entries: async function* () { for (const name of Object.keys(files)) yield [name, handleFor(name)] },
+      getFileHandle: async (name: string, opts?: { create?: boolean }) => {
+        if (!(name in files)) {
+          if (!opts?.create) throw new DOMException('Not found', 'NotFoundError')
+          files[name] = ''
+        }
+        return handleFor(name)
+      },
+      queryPermission: async () => 'granted' as PermissionState,
+    } as unknown as FileSystemDirectoryHandle
+  }
+
+  async function open(dir: FileSystemDirectoryHandle) {
+    vi.stubGlobal('showDirectoryPicker', vi.fn().mockResolvedValue(dir))
+    vi.stubGlobal('indexedDB', makeIDBMock({}))
+    await openFolder()
+  }
+
+  it('returns null until the file changes externally, then the new text once', async () => {
+    const files: Record<string, string> = { 'a.dsl': 'v1' }
+    await open(makeMutableDir(files))
+    await readDSLFile('a.dsl')
+
+    expect(await readDSLFileIfChanged('a.dsl')).toBeNull()
+    files['a.dsl'] = 'v2'
+    expect(await readDSLFileIfChanged('a.dsl')).toEqual({ content: 'v2', sidecarJson: undefined })
+    expect(await readDSLFileIfChanged('a.dsl')).toBeNull()
+  })
+
+  it('treats a sidecar change (including a new sidecar) as a change', async () => {
+    const files: Record<string, string> = { 'a.dsl': 'v1' }
+    await open(makeMutableDir(files))
+    await readDSLFile('a.dsl')
+
+    files['a.c4hero.json'] = '{}'
+    expect(await readDSLFileIfChanged('a.dsl')).toEqual({ content: 'v1', sidecarJson: '{}' })
+  })
+
+  it("ignores this tab's own writes", async () => {
+    const files: Record<string, string> = { 'a.dsl': 'v1' }
+    await open(makeMutableDir(files))
+    await readDSLFile('a.dsl')
+
+    await writeDSLFile('a.dsl', 'saved by app')
+    await writeSidecarFile('a.dsl', '{"x":1}')
+    expect(await readDSLFileIfChanged('a.dsl')).toBeNull()
+  })
+
+  it('discards a read that overlaps one of our writes', async () => {
+    const files: Record<string, string> = { 'a.dsl': 'v1' }
+    let overlapped: Promise<unknown> | null = null
+    await open(makeMutableDir(files, {
+      beforeClose: async () => { overlapped = readDSLFileIfChanged('a.dsl') },
+    }))
+    await readDSLFile('a.dsl')
+
+    await writeDSLFile('a.dsl', 'v2')
+    expect(await overlapped).toBeNull()
+  })
+
+  it('returns null when the file is gone', async () => {
+    const files: Record<string, string> = { 'a.dsl': 'v1' }
+    await open(makeMutableDir(files))
+    await readDSLFile('a.dsl')
+    delete files['a.dsl']
+    expect(await readDSLFileIfChanged('a.dsl')).toBeNull()
+  })
+})
+
+describe('readDSLFileIfChanged() — no baseline yet', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('records a never-seen sidecar as the baseline instead of reporting a change', async () => {
+    const files: Record<string, string> = { 'fresh.dsl': 'v1' }
+    const dir = {
+      kind: 'directory',
+      name: 'fresh',
+      entries: async function* () {},
+      getFileHandle: async (name: string, opts?: { create?: boolean }) => {
+        if (!(name in files) && !opts?.create) throw new DOMException('Not found', 'NotFoundError')
+        return {
+          kind: 'file',
+          name,
+          getFile: async () => new File([files[name] ?? ''], name),
+          createWritable: async () => ({ write: async (d: string) => { files[name] = d }, close: async () => {} }),
+        }
+      },
+      queryPermission: async () => 'granted' as PermissionState,
+    } as unknown as FileSystemDirectoryHandle
+    vi.stubGlobal('showDirectoryPicker', vi.fn().mockResolvedValue(dir))
+    vi.stubGlobal('indexedDB', makeIDBMock({}))
+    await openFolder()
+
+    // Created in-app: DSL written, sidecar never read or written.
+    await writeDSLFile('fresh.dsl', 'v1')
+    expect(await readDSLFileIfChanged('fresh.dsl')).toBeNull()
+
+    files['fresh.c4hero.json'] = '{}'
+    expect(await readDSLFileIfChanged('fresh.dsl')).toEqual({ content: 'v1', sidecarJson: '{}' })
+  })
+})

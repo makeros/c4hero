@@ -5,6 +5,7 @@ import { getCurrentDirHandle, writeDSLFile, writeSidecarFile } from '@/lib/folde
 import { serializeDSL } from '@/lib/dsl'
 import { extractSidecar, serializeSidecar } from '@/lib/sidecar'
 import { createLogger } from '@/lib/logger'
+import { isFreshFromDisk } from './useExternalFileReload'
 
 const log = createLogger('useAutoSave')
 
@@ -49,6 +50,8 @@ export function useAutoSave() {
         // after the debounce but before this idle callback.
         const state = useWorkspaceStore.getState()
         if (!state.workspace || state.workspace.name !== savedName) return
+        // Just reloaded from an external edit — the file already holds it.
+        if (isFreshFromDisk(state.workspace)) return
 
         const hasSingleFile = !!getCurrentFileHandle()
         const dirHandle = getCurrentDirHandle()
