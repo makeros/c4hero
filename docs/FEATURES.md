@@ -11,6 +11,13 @@ A more detailed reference for what c4hero ships. The README is the elevator pitc
 - Drill-through navigation between views (zoom into a system → its containers; zoom into a container → its components). View history with back navigation.
 - **Boundaries are first-class.** Container and component views auto-render the parent system / container as a labelled boundary around its members; deployment views nest one boundary per deployment node.
 - **Groups** for ad-hoc clustering across element types.
+- **C4 cheat sheet** — a standalone reference page (opened from the `BookOpenText`
+  icon in the canvas top pill, including in read-only mode) covering all 11
+  C4/Structurizr element kinds and all 9 view types with definitions, use-for /
+  not-for guidance, real-world examples and mini diagrams, an element × view
+  matrix, and a "What is it?" decision guide mapping everyday things (Postgres,
+  a Kafka topic, a Kubernetes pod, …) to the element type they should be modeled
+  as.
 
 ## Structurizr DSL
 

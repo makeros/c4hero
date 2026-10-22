@@ -71,6 +71,9 @@ vi.mock('@/components/ai/AiPanel', () => ({
 vi.mock('@/components/views/DocumentView', () => ({
   default: () => <div data-testid="document-view" />,
 }))
+vi.mock('@/components/views/CheatSheet', () => ({
+  default: () => <div data-testid="cheat-sheet" />,
+}))
 
 function makeWs(name = 'Locked WS'): Workspace {
   return {
@@ -201,6 +204,24 @@ describe('App — locked-workspace startup bootstrap', () => {
       expect(useWorkspaceStore.getState().workspace?.name).toBe('Locked WS')
     })
     await screen.findByTestId('document-view')
+    expect(navigateSpy).not.toHaveBeenCalled()
+  })
+
+  it('does not redirect away from /cheat-sheet when the locked workspace auto-loads', async () => {
+    const ws = makeWs()
+    vi.mocked(getLockedWorkspace).mockReturnValue(ws)
+    routerState.pathname = '/cheat-sheet'
+
+    render(
+      <MemoryRouter initialEntries={['/cheat-sheet']}>
+        <App />
+      </MemoryRouter>,
+    )
+
+    await waitFor(() => {
+      expect(useWorkspaceStore.getState().workspace?.name).toBe('Locked WS')
+    })
+    await screen.findByTestId('cheat-sheet')
     expect(navigateSpy).not.toHaveBeenCalled()
   })
 })

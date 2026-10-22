@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **C4 cheat sheet.** A new `/cheat-sheet` page, opened in a new tab from a
+  `BookOpenText` icon in the canvas top pill (also shown in read-only mode and
+  as a menu row on mobile), covers every C4/Structurizr element kind and view
+  type: definitions, use-for / not-for guidance, real-world examples, an
+  element × view matrix, and a "What is it?" decision guide mapping everyday
+  things to the element type they should be modeled as.
+
 ## [0.4.0] - 2026-08-30
 
 ### Added

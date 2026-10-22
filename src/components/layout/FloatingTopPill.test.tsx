@@ -213,4 +213,37 @@ describe('FloatingTopPill', () => {
       expect(btn.getAttribute('title')).toBe('Documents (D)')
     })
   })
+
+  describe('C4 cheat sheet link', () => {
+    it('renders the desktop link with the expected attributes when not read-only', () => {
+      useWorkspaceStore.getState().loadWorkspace(makeWs())
+      render(<FloatingTopPill />)
+      const link = screen.getByLabelText('C4 cheat sheet')
+      expect(link.getAttribute('href')).toBe('/cheat-sheet')
+      expect(link.getAttribute('target')).toBe('_blank')
+      expect(link.getAttribute('rel')).toBe('noopener noreferrer')
+      expect(link.getAttribute('title')).toBe('C4 cheat sheet')
+    })
+
+    it('renders the desktop link when read-only', () => {
+      useWorkspaceStore.getState().loadWorkspace(makeWs())
+      useWorkspaceStore.setState({ readOnly: true })
+      render(<FloatingTopPill />)
+      const link = screen.getByLabelText('C4 cheat sheet')
+      expect(link.getAttribute('href')).toBe('/cheat-sheet')
+      expect(link.getAttribute('target')).toBe('_blank')
+      expect(link.getAttribute('rel')).toBe('noopener noreferrer')
+    })
+
+    it('exposes a mobile menu row that opens the cheat sheet in a new tab and closes the menu', () => {
+      setMobile(true)
+      const open = vi.spyOn(window, 'open').mockReturnValue(null)
+      useWorkspaceStore.getState().loadWorkspace(makeWs())
+      render(<FloatingTopPill />)
+      fireEvent.click(screen.getByLabelText('More actions'))
+      fireEvent.click(screen.getByText('C4 cheat sheet'))
+      expect(open).toHaveBeenCalledWith('/cheat-sheet', '_blank', 'noopener,noreferrer')
+      expect(screen.queryByRole('menu')).toBeNull()
+    })
+  })
 })

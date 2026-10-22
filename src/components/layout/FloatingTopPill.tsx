@@ -25,6 +25,7 @@ import {
   LayoutGrid,
   Sparkles,
   FileText,
+  BookOpenText,
 } from 'lucide-react'
 import { useSettingsStore } from '@/store/settings'
 import { countDocumentedItems } from '@/lib/documentIndex'
@@ -478,6 +479,19 @@ export default function FloatingTopPill() {
               <Command size={15} />
             </button>
 
+            {/* C4 cheat sheet — opens in a new tab, shown regardless of readOnly */}
+            <a
+              href="/cheat-sheet"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn-icon"
+              style={{ width: 40, height: 44, borderRadius: 0, minWidth: 40, minHeight: 44 }}
+              title="C4 cheat sheet"
+              aria-label="C4 cheat sheet"
+            >
+              <BookOpenText size={15} />
+            </a>
+
             {/* Documents sidebar toggle — last button, carries the pill's right-edge rounding */}
             <button
               className="btn-icon"
@@ -572,6 +586,12 @@ export default function FloatingTopPill() {
               label={documentCount > 0 ? `Documents (${documentCount})` : 'Documents'}
               pressed={documentsSidebarOpen}
               onClick={() => { setHamburgerOpen(false); useSettingsStore.getState().update({ documentsSidebarOpen: !useSettingsStore.getState().documentsSidebarOpen }) }}
+            />
+            <div style={{ borderTop: '1px solid var(--color-border)', margin: '4px 0' }} />
+            <MenuItemRow
+              icon={BookOpenText}
+              label="C4 cheat sheet"
+              onClick={() => { setHamburgerOpen(false); window.open('/cheat-sheet', '_blank', 'noopener,noreferrer') }}
             />
             {showUndoRedo && !readOnly && (
               <>

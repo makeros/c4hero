@@ -32,6 +32,7 @@ const SearchDialog = lazy(() => import('@/components/search/SearchDialog'))
 const WelcomeScreen = lazy(() => import('@/components/welcome/WelcomeScreen'))
 const AiPanel = lazy(() => import('@/components/ai/AiPanel'))
 const DocumentView = lazy(() => import('@/components/views/DocumentView'))
+const CheatSheet = lazy(() => import('@/components/views/CheatSheet'))
 
 export default function App() {
   const workspace = useWorkspaceStore((s) => s.workspace)
@@ -188,6 +189,14 @@ export default function App() {
         <Route path="/document-view" element={
           <Suspense fallback={<LoadingDot />}>
             <DocumentView />
+          </Suspense>
+        } />
+
+        {/* Standalone C4 cheat sheet — opened in a new tab from the top
+            pill's BookOpenText link, never wrapped in canvas chrome. */}
+        <Route path="/cheat-sheet" element={
+          <Suspense fallback={<LoadingDot />}>
+            <CheatSheet />
           </Suspense>
         } />
 
