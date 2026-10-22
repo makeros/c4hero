@@ -26,6 +26,14 @@ import type { ServerResponse } from 'node:http'
 // fixed commit label so consecutive builds are byte-identical).
 const exportBuild = process.env.C4HERO_EXPORT_BUILD === '1'
 
+// Set by scripts/build-viewer.mjs (see the virtual:locked-workspace plugin
+// below). The locked viewer is often deployed behind HTTP basic auth, where
+// the service worker's precache requests are rejected and the worker fails
+// to install. It also needs no offline support, so it ships a
+// self-destroying worker instead (which also removes any previously installed
+// one).
+const lockedViewerBuild = Boolean(process.env.LOCKED_WORKSPACE_PATH)
+
 const commitHash = exportBuild ? 'export' : execSync('git rev-parse --short HEAD').toString().trim()
 const appVersion = JSON.parse(readFileSync(path.resolve(__dirname, 'package.json'), 'utf8')).version
 
@@ -334,6 +342,10 @@ export default defineConfig({
     } satisfies Plugin]),
     ...(exportBuild ? [] : [VitePWA({
       registerType: 'autoUpdate',
+      selfDestroying: lockedViewerBuild,
+      // Without `crossorigin="use-credentials"` browsers fetch the manifest
+      // without credentials, so it fails behind basic auth.
+      useCredentials: true,
       includeAssets: ['c4-logo.png', 'apple-touch-icon.png'],
       manifest: {
         name: 'c4hero',
