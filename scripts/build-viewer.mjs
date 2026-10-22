@@ -11,7 +11,7 @@
 // Usage: npm run build:viewer -- --workspace /path/to/workspace.dsl
 
 import { spawn } from 'node:child_process'
-import { existsSync, statSync } from 'node:fs'
+import { existsSync, statSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { createServer } from 'vite'
 import { sidecarName } from '../src/lib/sidecarName.ts'
@@ -120,6 +120,20 @@ async function copyReferencedDocuments(workspacePath, root) {
   writeDocumentCopies(plan, path.join(root, 'dist-viewer'))
 }
 
+// `npx serve dist-viewer -s` redirects a `/__docs/x.html` request to the
+// extensionless `/__docs/x` by default, and `-s` then answers that with the
+// app's own index.html instead of the document, breaking the frame. `serve`
+// honors `cleanUrls: false` in serve.json to keep `.html` URLs intact; other
+// hosts that strip `.html` (for example Cloudflare Pages) need their own
+// equivalent setting turned off. Written after the vite build, same as
+// copyReferencedDocuments above, since the build empties dist-viewer/.
+function writeServeConfig(root) {
+  writeFileSync(
+    path.join(root, 'dist-viewer', 'serve.json'),
+    JSON.stringify({ cleanUrls: false }) + '\n'
+  )
+}
+
 const vite = spawn(viteBin, ['build', '--outDir', 'dist-viewer', ...args], {
   stdio: 'inherit',
   env,
@@ -138,7 +152,10 @@ vite.on('exit', (code, signal) => {
     return
   }
   copyReferencedDocuments(resolved, projectRoot)
-    .then(() => process.exit(0))
+    .then(() => {
+      writeServeConfig(projectRoot)
+      process.exit(0)
+    })
     .catch((err) => {
       console.error('[build:viewer] failed to collect referenced documents:', err)
       process.exit(1)

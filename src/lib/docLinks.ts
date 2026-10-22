@@ -43,7 +43,7 @@ function decode(value: string): string | null {
   }
 }
 
-const DOC_EXT = /\.(md|markdown)$/i
+const DOC_EXT = /\.(md|markdown|html|htm)$/i
 
 /**
  * Classifies `href` found in the document at `currentPath` (project-root
@@ -138,34 +138,26 @@ function headingFragment(heading: string): string {
   return last.startsWith('^') ? '' : slugify(last)
 }
 
-/**
- * Resolves an Obsidian-style `[[target#heading]]` found in the document at
- * `currentPath`. Lookup order: relative to the current folder, root-relative,
- * then a name match anywhere in `index` (case-insensitive, exact case first;
- * ties: same folder as the current doc, fewest segments, alphabetical). When
- * `index` is null (unavailable) the relative path is returned as the guess.
- */
-export function resolveWikilink(currentPath: string, rawTarget: string, index: string[] | null): WikilinkResolution {
-  const { target, heading } = parseWikilink(rawTarget)
-  const fragment = headingFragment(heading)
-  if (!target) {
-    return fragment ? { kind: 'anchor', fragment } : { kind: 'unresolved', target: rawTarget.trim(), path: '' }
-  }
+/** Not-found guess for `name` relative to `currentDir`: a `..` path makes the
+ *  viewer show "Document not found". */
+function guessWikilinkPath(currentDir: string[], name: string): string {
+  const nameSegments = name.split(/[\\/]/)
+  const relativePath = normalizeSegments([...(name.startsWith('/') ? [] : currentDir), ...nameSegments])?.join('/') ?? null
+  const cleanName = name.replace(/^\/+/, '')
+  return relativePath ?? (cleanName.startsWith('../') ? cleanName : `../${cleanName}`)
+}
 
-  const name = DOC_EXT.test(target) ? target : `${target}.md`
-  const currentDir = currentPath.split('/').slice(0, -1)
+/** Looks up `name` in `index`: relative to `currentDir`, then root-relative,
+ *  then a name match anywhere in `index` (case-insensitive, exact case first;
+ *  ties: same folder as the current doc, fewest segments, alphabetical). */
+function matchWikilinkName(index: string[], currentDir: string[], name: string): string | null {
   const nameSegments = name.split(/[\\/]/)
   const relativePath = normalizeSegments([...(name.startsWith('/') ? [] : currentDir), ...nameSegments])?.join('/') ?? null
   const rootPath = normalizeSegments(nameSegments)?.join('/') ?? null
-  // Not-found guess: a `..` path makes the viewer show "Document not found".
-  const cleanName = name.replace(/^\/+/, '')
-  const guessPath = relativePath ?? (cleanName.startsWith('../') ? cleanName : `../${cleanName}`)
-
-  if (index === null) return { kind: 'doc', path: guessPath, fragment }
 
   const known = new Set(index)
   for (const candidate of [relativePath, rootPath]) {
-    if (candidate && known.has(candidate)) return { kind: 'doc', path: candidate, fragment }
+    if (candidate && known.has(candidate)) return candidate
   }
 
   const wanted = nameSegments.filter((s) => s && s !== '.' && s !== '..').join('/')
@@ -184,9 +176,35 @@ export function resolveWikilink(currentPath: string, rawTarget: string, index: s
       a.split('/').length - b.split('/').length ||
       a.localeCompare(b),
   )
-  if (matches.length > 0) return { kind: 'doc', path: matches[0], fragment }
+  return matches.length > 0 ? matches[0] : null
+}
 
-  return { kind: 'unresolved', target: rawTarget.trim(), path: guessPath }
+/**
+ * Resolves an Obsidian-style `[[target#heading]]` found in the document at
+ * `currentPath`. An explicit `.md`/`.markdown`/`.html`/`.htm` target is used
+ * as written. An extensionless target tries the `.md` candidates first and,
+ * only when none match, the same lookup with `.html` (markdown wins when both
+ * exist). When `index` is null (unavailable) the `.md` relative path is
+ * returned as the guess.
+ */
+export function resolveWikilink(currentPath: string, rawTarget: string, index: string[] | null): WikilinkResolution {
+  const { target, heading } = parseWikilink(rawTarget)
+  const fragment = headingFragment(heading)
+  if (!target) {
+    return fragment ? { kind: 'anchor', fragment } : { kind: 'unresolved', target: rawTarget.trim(), path: '' }
+  }
+
+  const currentDir = currentPath.split('/').slice(0, -1)
+  const names = DOC_EXT.test(target) ? [target] : [`${target}.md`, `${target}.html`]
+
+  if (index === null) return { kind: 'doc', path: guessWikilinkPath(currentDir, names[0]), fragment }
+
+  for (const name of names) {
+    const match = matchWikilinkName(index, currentDir, name)
+    if (match) return { kind: 'doc', path: match, fragment }
+  }
+
+  return { kind: 'unresolved', target: rawTarget.trim(), path: guessWikilinkPath(currentDir, names[0]) }
 }
 
 // ---- Text-based link extraction (Node-safe, no DOM) -----------------------
@@ -235,6 +253,6 @@ export function extractDocLinks(markdown: string): ExtractedLinks {
   const withoutWiki = text.replace(/!?\[\[([^[\]\n]+?)\]\]/g, ' ')
   for (const m of withoutWiki.matchAll(/\]\(\s*(?:<([^>\n]*)>|([^)\s]+))/g)) hrefs.push(m[1] ?? m[2])
   for (const m of withoutWiki.matchAll(/^ {0,3}\[[^\]\n]+\]:\s*(?:<([^>\n]*)>|(\S+))/gm)) hrefs.push(m[1] ?? m[2])
-  for (const m of withoutWiki.matchAll(/<([^<>\s]+\.(?:md|markdown)(?:#[^<>\s]*)?)>/gi)) hrefs.push(m[1])
+  for (const m of withoutWiki.matchAll(/<([^<>\s]+\.(?:md|markdown|html|htm)(?:#[^<>\s]*)?)>/gi)) hrefs.push(m[1])
   return { hrefs, wikilinks }
 }

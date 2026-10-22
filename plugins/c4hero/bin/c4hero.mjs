@@ -2527,7 +2527,9 @@ var createNavigationSlice = (set, get) => ({
 	pendingZoomConfirm: null,
 	createViewDefaults: null,
 	focusElementId: null,
+	focusRelationshipId: null,
 	clearFocusElement: () => set({ focusElementId: null }),
+	clearFocusRelationship: () => set({ focusRelationshipId: null }),
 	focusViewForElements: (ids) => set((s) => {
 		if (!s.workspace || ids.length === 0) return;
 		const idSet = new Set(ids);
@@ -2630,6 +2632,26 @@ var createNavigationSlice = (set, get) => ({
 		s.selectedRelationshipId = null;
 		s.selectedGroupId = null;
 		if (clearHighlightFiltersWithStash(s)) announce("Highlighter cleared on view change");
+	}),
+	revealInView: (viewKey, target) => set((s) => {
+		if (s.activeViewKey !== viewKey) {
+			if (s.activeViewKey) s.viewHistory.push(s.activeViewKey);
+			s.activeViewKey = viewKey;
+			clearSelectionDraft(s);
+			if (clearHighlightFiltersWithStash(s)) announce("Highlighter cleared on view change");
+		}
+		if (target.kind === "element") {
+			s.selectedElementIds = [target.id];
+			s.selectedRelationshipId = null;
+			s.focusElementId = target.id;
+			s.focusRelationshipId = null;
+		} else {
+			s.selectedRelationshipId = target.id;
+			s.selectedElementIds = [];
+			s.focusRelationshipId = target.id;
+			s.focusElementId = null;
+		}
+		s.selectedGroupId = null;
 	})
 });
 //#endregion
@@ -3613,6 +3635,7 @@ var createLifecycleSlice = (set, get) => ({
 			selectedRelationshipId: null,
 			selectedGroupId: null,
 			focusElementId: null,
+			focusRelationshipId: null,
 			aiPanelOpen: false,
 			aiSettingsOpen: false,
 			aiPanelFeature: null,
@@ -3641,6 +3664,7 @@ var createLifecycleSlice = (set, get) => ({
 			selectedRelationshipId: null,
 			selectedGroupId: null,
 			focusElementId: null,
+			focusRelationshipId: null,
 			aiPanelOpen: false,
 			aiSettingsOpen: false,
 			aiPanelFeature: null,
@@ -3965,9 +3989,22 @@ var useWorkspaceStore = create()(immer((...a) => ({
 //#endregion
 //#region src/lib/docPath.ts
 var MARKDOWN_EXTENSIONS = [".md", ".markdown"];
+var HTML_EXTENSIONS = [".html", ".htm"];
+var DOCUMENT_EXTENSIONS = [...MARKDOWN_EXTENSIONS, ...HTML_EXTENSIONS];
 function hasMarkdownExtension(docPath) {
 	const lower = docPath.toLowerCase();
 	return MARKDOWN_EXTENSIONS.some((ext) => lower.endsWith(ext));
+}
+/** True for a markdown or HTML document path (`.md` `.markdown` `.html` `.htm`). */
+function hasDocumentExtension(docPath) {
+	const lower = docPath.toLowerCase();
+	return DOCUMENT_EXTENSIONS.some((ext) => lower.endsWith(ext));
+}
+/** The document kind by extension, or null when `docPath` is neither markdown nor HTML. */
+function documentKind(docPath) {
+	if (hasMarkdownExtension(docPath)) return "markdown";
+	const lower = docPath.toLowerCase();
+	return HTML_EXTENSIONS.some((ext) => lower.endsWith(ext)) ? "html" : null;
 }
 /** True when any segment starts with `.` — blocks dotfiles/dirs and `..`. */
 function hasHiddenSegment(docPath) {
@@ -3977,7 +4014,7 @@ function hasHiddenSegment(docPath) {
 *  null when it is. Does not touch the filesystem. */
 function docPathProblem(docPath) {
 	if (isAbsolute(docPath) || /^[a-zA-Z]:/.test(docPath)) return "must be relative to the project root, not absolute";
-	if (!hasMarkdownExtension(docPath)) return "must end in .md or .markdown";
+	if (!hasDocumentExtension(docPath)) return "must end in .md, .markdown, .html or .htm";
 	if (hasHiddenSegment(docPath)) return "must not contain hidden or '..' segments";
 	return null;
 }
@@ -8319,7 +8356,7 @@ function commonSetup(args, ctx) {
 	const ref = args.positionals[0];
 	if (!ref) throw new CliFailure("USAGE", "Missing <ref> (element ref or relationship ref).");
 	const rawPath = flag(args, "path");
-	if (!rawPath) throw new CliFailure("USAGE", "Missing --path <repo-relative.md>.");
+	if (!rawPath) throw new CliFailure("USAGE", "Missing --path <repo-relative.md|.html>.");
 	const docPath = validatedPath(rawPath);
 	const session = openForEdit(args, ctx);
 	const target = resolveTarget(session.workspace(), ref, flag(args, "match"));
@@ -8345,16 +8382,17 @@ var docsCommands = [{
 		],
 		booleans: ["create", ...MUTATING_BOOLEANS]
 	},
-	usage: "link-doc <ref|relRef> --path <repo-relative.md> [--title <text>] [--create] [--match <description>] [--file <dsl>] [--dry-run] [--force]",
+	usage: "link-doc <ref|relRef> --path <repo-relative.md|.html> [--title <text>] [--create] [--match <description>] [--file <dsl>] [--dry-run] [--force]",
 	run(args, ctx) {
 		const { file, session, target, docPath, dryRun } = commonSetup(args, ctx);
 		const warnings = [];
 		const root = projectRootFor(file);
 		const absolute = path.resolve(root, docPath);
 		if (!isInsideRoot(root, absolute) || !isInsideRootReal(root, absolute)) throw new CliFailure("USAGE", `Document path '${docPath}' resolves outside the project root ${root}.`);
+		if (boolFlag(args, "create") && documentKind(docPath) !== "markdown") throw new CliFailure("USAGE", `--create only scaffolds markdown; '${docPath}' is not a markdown path.`);
 		const docs = currentDocs(target);
 		const existing = docs.findIndex((d) => d.path === docPath);
-		const title = flag(args, "title") ?? docs[existing]?.title ?? path.posix.basename(docPath).replace(/\.(md|markdown)$/i, "");
+		const title = flag(args, "title") ?? docs[existing]?.title ?? path.posix.basename(docPath).replace(/\.(md|markdown|html|htm)$/i, "");
 		const next = existing === -1 ? [...docs, {
 			path: docPath,
 			title
@@ -8397,7 +8435,7 @@ var docsCommands = [{
 		values: ["path", "match"],
 		booleans: MUTATING_BOOLEANS
 	},
-	usage: "unlink-doc <ref|relRef> --path <repo-relative.md> [--match <description>] [--file <dsl>] [--dry-run] [--force]",
+	usage: "unlink-doc <ref|relRef> --path <repo-relative.md|.html> [--match <description>] [--file <dsl>] [--dry-run] [--force]",
 	run(args, ctx) {
 		const { file, session, target, docPath, dryRun } = commonSetup(args, ctx);
 		const docs = currentDocs(target);

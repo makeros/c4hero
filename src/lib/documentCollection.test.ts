@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from 'vitest'
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync, symlinkSync, readFileSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { findReferencedDocumentPaths, planDocumentCopies, writeDocumentCopies } from './documentCollection'
+import { findReferencedDocumentPaths, MAX_ASSET_BYTES, planDocumentCopies, servedPaths, writeDocumentCopies } from './documentCollection'
 import { serializeDSL } from './dsl'
 import { docsRootFor } from './docPath'
 import type { Workspace, DocLink } from '@/types/model'
@@ -104,7 +104,7 @@ describe('planDocumentCopies', () => {
             people: [{ id: 'p1', type: 'person', name: 'P', tags: [], properties: {}, documents: [DOC_A, DOC_B] }],
         }))
         const plan = planDocumentCopies([file], dir)
-        expect(plan.copies).toEqual([{ from: join(dir, 'docs', 'a.md'), to: '__docs/docs/a.md' }])
+        expect(plan.copies).toEqual([{ from: join(dir, 'docs', 'a.md'), to: '__docs/docs/a.md', kind: 'markdown' }])
         expect(plan.missing).toEqual(['docs/b.md'])
     })
 
@@ -119,7 +119,7 @@ describe('planDocumentCopies', () => {
             people: [{ id: 'p1', type: 'person', name: 'P', tags: [], properties: {}, documents: [DOC_A] }],
         })), 'utf8')
         const plan = planDocumentCopies([file], docsRootFor(join(dir, 'arch')))
-        expect(plan.copies).toEqual([{ from: join(dir, 'docs', 'a.md'), to: '__docs/docs/a.md' }])
+        expect(plan.copies).toEqual([{ from: join(dir, 'docs', 'a.md'), to: '__docs/docs/a.md', kind: 'markdown' }])
         expect(plan.missing).toEqual([])
     })
 
@@ -134,7 +134,7 @@ describe('planDocumentCopies', () => {
             ],
         }))
         const plan = planDocumentCopies([file], dir)
-        expect(plan.copies).toEqual([{ from: join(dir, 'docs', 'a.md'), to: '__docs/docs/a.md' }])
+        expect(plan.copies).toEqual([{ from: join(dir, 'docs', 'a.md'), to: '__docs/docs/a.md', kind: 'markdown' }])
         expect(plan.missing).toEqual([])
     })
 
@@ -367,5 +367,152 @@ describe('transitive document collection', () => {
         const plan = planDocumentCopies([dsl], dir)
         expect(plan.copies).toHaveLength(2000)
         expect(plan.warnings).toHaveLength(1)
+    })
+})
+
+describe('HTML document and asset collection', () => {
+    let dir: string
+    let out: string
+
+    afterEach(() => {
+        if (dir) rmSync(dir, { recursive: true, force: true })
+        if (out) rmSync(out, { recursive: true, force: true })
+    })
+
+    function setup(files: Record<string, string>, rootDoc: string): string {
+        dir = mkdtempSync(join(tmpdir(), 'c4hero-doc-html-'))
+        for (const [rel, body] of Object.entries(files)) {
+            mkdirSync(join(dir, rel, '..'), { recursive: true })
+            writeFileSync(join(dir, rel), body, 'utf8')
+        }
+        const dsl = join(dir, 'workspace.dsl')
+        writeFileSync(dsl, serializeDSL(ws({
+            people: [{ id: 'p1', type: 'person', name: 'P', tags: [], properties: {}, documents: [{ path: rootDoc, title: 'R' }] }],
+        })), 'utf8')
+        return dsl
+    }
+
+    it('collects an HTML document, its subresources (through CSS too) and its markdown link, and rejects a hidden-segment subresource', () => {
+        const dsl = setup({
+            'docs/r.html':
+                '<html><head><link rel="stylesheet" href="r.css"></head>' +
+                '<body><img src=".secret/x.png"><img src="../shared/logo.svg">' +
+                '<script src="app.js"></script><a href="n.md">N</a></body></html>',
+            'docs/r.css': 'body { background: url(img/bg.png); }',
+            'docs/img/bg.png': 'PNGDATA',
+            'docs/app.js': 'console.log(1)',
+            'shared/logo.svg': '<svg></svg>',
+            'docs/n.md': '# N',
+        }, 'docs/r.html')
+
+        const plan = planDocumentCopies([dsl], dir)
+
+        expect(plan.copies).toEqual([
+            { from: join(dir, 'docs', 'r.html'), to: '__docs/docs/r.html', kind: 'html' },
+            { from: join(dir, 'docs', 'r.css'), to: '__docs/docs/r.css', kind: 'asset' },
+            { from: join(dir, 'shared', 'logo.svg'), to: '__docs/shared/logo.svg', kind: 'asset' },
+            { from: join(dir, 'docs', 'app.js'), to: '__docs/docs/app.js', kind: 'asset' },
+            { from: join(dir, 'docs', 'n.md'), to: '__docs/docs/n.md', kind: 'markdown' },
+            { from: join(dir, 'docs', 'img', 'bg.png'), to: '__docs/docs/img/bg.png', kind: 'asset' },
+        ])
+        expect(plan.missing).toEqual(['docs/.secret/x.png'])
+        expect(plan.warnings).toEqual([])
+    })
+
+    it('pulls in an HTML document and its assets when a markdown document links it', () => {
+        const dsl = setup({
+            'docs/a.md': '[r](r.html)',
+            'docs/r.html': '<html><head><link rel="stylesheet" href="r.css"></head><body>Hi</body></html>',
+            'docs/r.css': 'body {}',
+        }, 'docs/a.md')
+
+        const plan = planDocumentCopies([dsl], dir)
+
+        expect(plan.copies.map((c) => ({ to: c.to, kind: c.kind }))).toEqual([
+            { to: '__docs/docs/a.md', kind: 'markdown' },
+            { to: '__docs/docs/r.html', kind: 'html' },
+            { to: '__docs/docs/r.css', kind: 'asset' },
+        ])
+        expect(plan.missing).toEqual([])
+    })
+
+    it('does not copy a subresource that is a symlink pointing outside the root', () => {
+        const outside = mkdtempSync(join(tmpdir(), 'c4hero-doc-html-outside-'))
+        writeFileSync(join(outside, 'secret.png'), 'secret', 'utf8')
+        try {
+            const dsl = setup({
+                'docs/r.html': '<html><body><img src="evil.png"></body></html>',
+            }, 'docs/r.html')
+            symlinkSync(join(outside, 'secret.png'), join(dir, 'docs', 'evil.png'))
+
+            const plan = planDocumentCopies([dsl], dir)
+            expect(plan.copies.map((c) => c.to)).toEqual(['__docs/docs/r.html'])
+            expect(plan.missing).toEqual(['docs/evil.png'])
+        } finally {
+            rmSync(outside, { recursive: true, force: true })
+        }
+    })
+
+    it('skips an asset larger than the size cap and warns, without failing the plan', () => {
+        dir = mkdtempSync(join(tmpdir(), 'c4hero-doc-html-'))
+        mkdirSync(join(dir, 'docs'))
+        writeFileSync(join(dir, 'docs', 'r.html'), '<html><body><img src="big.png"></body></html>', 'utf8')
+        writeFileSync(join(dir, 'docs', 'big.png'), Buffer.alloc(MAX_ASSET_BYTES + 1))
+        const dsl = join(dir, 'workspace.dsl')
+        writeFileSync(dsl, serializeDSL(ws({
+            people: [{ id: 'p1', type: 'person', name: 'P', tags: [], properties: {}, documents: [{ path: 'docs/r.html', title: 'R' }] }],
+        })), 'utf8')
+
+        const plan = planDocumentCopies([dsl], dir)
+        expect(plan.copies.map((c) => c.to)).toEqual(['__docs/docs/r.html'])
+        expect(plan.missing).toEqual([])
+        expect(plan.warnings).toEqual(['skipped docs/big.png: larger than the 25 MB asset size cap'])
+    })
+
+    it('writes HTML with its markdown link rewritten and lists only documents (no assets) in __index.json', () => {
+        const dsl = setup({
+            'docs/r.html':
+                '<html><head><link rel="stylesheet" href="r.css"></head>' +
+                '<body><script src="app.js"></script><a href="n.md">N</a></body></html>',
+            'docs/r.css': 'body {}',
+            'docs/app.js': 'console.log(1)',
+            'docs/n.md': '# N',
+        }, 'docs/r.html')
+
+        const plan = planDocumentCopies([dsl], dir)
+        out = mkdtempSync(join(tmpdir(), 'c4hero-doc-html-out-'))
+        writeDocumentCopies(plan, out)
+
+        const html = readFileSync(join(out, '__docs/docs/r.html'), 'utf8')
+        expect(html).toContain('href="/document-view?path=docs%2Fn.md&title=N"')
+        expect(html).toContain('target="_top"')
+        expect(existsSync(join(out, '__docs/docs/r.css'))).toBe(true)
+        expect(existsSync(join(out, '__docs/docs/app.js'))).toBe(true)
+
+        expect(JSON.parse(readFileSync(join(out, '__docs/__index.json'), 'utf8'))).toEqual({
+            files: ['docs/n.md', 'docs/r.html'],
+        })
+    })
+
+    it('m1a: percent-decodes a subresource target so an escaped filename resolves to the real file on disk', () => {
+        const dsl = setup({
+            'docs/r.html': '<html><body><img src="my%20logo.png"></body></html>',
+            'docs/my logo.png': 'PNGDATA',
+        }, 'docs/r.html')
+
+        const plan = planDocumentCopies([dsl], dir)
+        expect(plan.copies.map((c) => c.to)).toEqual(['__docs/docs/r.html', '__docs/docs/my logo.png'])
+        expect(plan.missing).toEqual([])
+    })
+
+    it('servedPaths returns the __docs-relative path of every planned copy, markdown, html and asset alike', () => {
+        const dsl = setup({
+            'docs/r.html': '<html><head><link rel="stylesheet" href="r.css"></head><body><a href="n.md">N</a></body></html>',
+            'docs/r.css': 'body {}',
+            'docs/n.md': '# N',
+        }, 'docs/r.html')
+
+        const plan = planDocumentCopies([dsl], dir)
+        expect(servedPaths(plan)).toEqual(new Set(['docs/r.html', 'docs/r.css', 'docs/n.md']))
     })
 })

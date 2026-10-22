@@ -232,6 +232,20 @@ describe('DocumentView', () => {
     })
   })
 
+  describe('html documents', () => {
+    it('renders HtmlDocumentFrame for an HTML path, not the markdown view', async () => {
+      stubFetch(() => res({ ok: true, status: 200, text: async () => '' }))
+      render(
+        <MemoryRouter initialEntries={['/document-view?path=docs/r.html&title=Report']}>
+          <DocumentView />
+        </MemoryRouter>,
+      )
+      const iframe = await screen.findByTitle('Report')
+      expect(iframe.tagName).toBe('IFRAME')
+      expect(document.querySelector('.document-view-content')).toBeNull()
+    })
+  })
+
   describe('live reload', () => {
     function mountWithBody(body: { current: string }, files: string[] = ['docs/a.md']) {
       vi.stubGlobal(

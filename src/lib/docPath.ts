@@ -6,10 +6,94 @@ import { existsSync, readdirSync, realpathSync, statSync } from 'node:fs'
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 
 const MARKDOWN_EXTENSIONS = ['.md', '.markdown']
+const HTML_EXTENSIONS = ['.html', '.htm']
+const DOCUMENT_EXTENSIONS = [...MARKDOWN_EXTENSIONS, ...HTML_EXTENSIONS]
+
+// Relative-asset allowlist for HTML documents (D4): styles, scripts and the
+// media types they commonly reference. Never `.json`, `.map`, `.wasm` or
+// `.ts` — those are source/data, not renderable subresources.
+const ASSET_EXTENSIONS = [
+  '.css',
+  '.js',
+  '.mjs',
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.gif',
+  '.svg',
+  '.webp',
+  '.avif',
+  '.ico',
+  '.woff',
+  '.woff2',
+  '.ttf',
+  '.otf',
+  '.mp4',
+  '.webm',
+  '.mp3',
+  '.ogg',
+]
+
+const CONTENT_TYPES: Record<string, string> = {
+  '.md': 'text/markdown; charset=utf-8',
+  '.markdown': 'text/markdown; charset=utf-8',
+  '.html': 'text/html; charset=utf-8',
+  '.htm': 'text/html; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.mjs': 'text/javascript; charset=utf-8',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.svg': 'image/svg+xml',
+  '.webp': 'image/webp',
+  '.avif': 'image/avif',
+  '.ico': 'image/x-icon',
+  '.woff': 'font/woff',
+  '.woff2': 'font/woff2',
+  '.ttf': 'font/ttf',
+  '.otf': 'font/otf',
+  '.mp4': 'video/mp4',
+  '.webm': 'video/webm',
+  '.mp3': 'audio/mpeg',
+  '.ogg': 'audio/ogg',
+}
+
+export type DocumentKind = 'markdown' | 'html'
 
 export function hasMarkdownExtension(docPath: string): boolean {
   const lower = docPath.toLowerCase()
   return MARKDOWN_EXTENSIONS.some((ext) => lower.endsWith(ext))
+}
+
+/** True for a markdown or HTML document path (`.md` `.markdown` `.html` `.htm`). */
+export function hasDocumentExtension(docPath: string): boolean {
+  const lower = docPath.toLowerCase()
+  return DOCUMENT_EXTENSIONS.some((ext) => lower.endsWith(ext))
+}
+
+/** The document kind by extension, or null when `docPath` is neither markdown nor HTML. */
+export function documentKind(docPath: string): DocumentKind | null {
+  if (hasMarkdownExtension(docPath)) return 'markdown'
+  const lower = docPath.toLowerCase()
+  return HTML_EXTENSIONS.some((ext) => lower.endsWith(ext)) ? 'html' : null
+}
+
+/** True when `docPath` has one of the allowlisted HTML-subresource extensions (D4). */
+export function hasAssetExtension(docPath: string): boolean {
+  const lower = docPath.toLowerCase()
+  return ASSET_EXTENSIONS.some((ext) => lower.endsWith(ext))
+}
+
+/** Response `Content-Type` for a document or allowlisted asset path, by extension.
+ *  Falls back to `application/octet-stream` for anything unrecognised. */
+export function contentTypeFor(docPath: string): string {
+  const lower = docPath.toLowerCase()
+  for (const [ext, type] of Object.entries(CONTENT_TYPES)) {
+    if (lower.endsWith(ext)) return type
+  }
+  return 'application/octet-stream'
 }
 
 /** True when any segment starts with `.` — blocks dotfiles/dirs and `..`. */
@@ -21,7 +105,7 @@ export function hasHiddenSegment(docPath: string): boolean {
  *  null when it is. Does not touch the filesystem. */
 export function docPathProblem(docPath: string): string | null {
   if (isAbsolute(docPath) || /^[a-zA-Z]:/.test(docPath)) return 'must be relative to the project root, not absolute'
-  if (!hasMarkdownExtension(docPath)) return 'must end in .md or .markdown'
+  if (!hasDocumentExtension(docPath)) return 'must end in .md, .markdown, .html or .htm'
   if (hasHiddenSegment(docPath)) return "must not contain hidden or '..' segments"
   return null
 }
@@ -80,23 +164,25 @@ export function resolveDocRequest(
   return { absolute, rejected }
 }
 
-/** Root-relative POSIX path of `file` when it's a document `listMarkdownFiles`
- *  would list (markdown, inside `root`, no hidden segment or `node_modules`),
- *  else null. Textual only — `file` may already be deleted. */
+/** Root-relative POSIX path of `file` when it's a document or allowlisted asset
+ *  under `root` (no hidden segment or `node_modules`), else null — so the dev
+ *  watcher can announce both document and asset changes. Textual only;
+ *  `file` may already be deleted. */
 export function docRelativePath(root: string, file: string): string | null {
   const rel = relative(resolve(root), resolve(file))
   if (rel === '' || rel.startsWith('..') || isAbsolute(rel)) return null
   const posix = rel.split(sep).join('/')
-  if (!hasMarkdownExtension(posix) || hasHiddenSegment(posix) || posix.split('/').includes('node_modules')) return null
+  if ((!hasDocumentExtension(posix) && !hasAssetExtension(posix)) || hasHiddenSegment(posix) || posix.split('/').includes('node_modules')) return null
   return posix
 }
 
-/** Root-relative POSIX paths of every markdown file under `root` (names sorted per folder).
- *  Skips hidden segments and `node_modules`, never follows directory symlinks,
- *  and drops file symlinks whose target lies outside `root`. Stops at `limit`
- *  entries (`truncated: true`). */
-export function listMarkdownFiles(
+/** Root-relative POSIX paths of every file under `root` matching `matches` (names
+ *  sorted per folder). Skips hidden segments and `node_modules`, never follows
+ *  directory symlinks, and drops file symlinks whose target lies outside `root`.
+ *  Stops at `limit` entries (`truncated: true`). */
+function listFilesByExtension(
   root: string,
+  matches: (name: string) => boolean,
   { limit = 10_000 }: { limit?: number } = {},
 ): { files: string[]; truncated: boolean } {
   const files: string[] = []
@@ -123,7 +209,7 @@ export function listMarkdownFiles(
       const rel = prefix + entry.name
       if (entry.isDirectory()) {
         walk(abs, rel + '/')
-      } else if (hasMarkdownExtension(entry.name) && (entry.isFile() || entry.isSymbolicLink())) {
+      } else if (matches(entry.name) && (entry.isFile() || entry.isSymbolicLink())) {
         try {
           if (!statSync(abs).isFile() || !isInsideRoot(realRoot, realpathSync(abs))) continue
         } catch {
@@ -139,4 +225,14 @@ export function listMarkdownFiles(
   }
   walk(resolve(root), '')
   return { files, truncated }
+}
+
+export function listMarkdownFiles(root: string, opts?: { limit?: number }): { files: string[]; truncated: boolean } {
+  return listFilesByExtension(root, hasMarkdownExtension, opts)
+}
+
+/** Root-relative POSIX paths of every markdown and HTML file under `root`
+ *  (D8's index). Same walk rules as `listMarkdownFiles`. */
+export function listDocumentFiles(root: string, opts?: { limit?: number }): { files: string[]; truncated: boolean } {
+  return listFilesByExtension(root, hasDocumentExtension, opts)
 }

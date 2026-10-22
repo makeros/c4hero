@@ -117,10 +117,12 @@ never refuse (findings appear as `info`).
 
 ## Docs, properties, sidecar
 
-- Link markdown to elements or relationships with `link-doc <ref|'src->dst'>
+- Link documents to elements or relationships with `link-doc <ref|'src->dst'>
   --path docs/x.md --title "..." [--create]`. Paths are repo-relative, end in
-  `.md`/`.markdown`, no `..` or hidden segments. A missing file only warns;
-  `--create` scaffolds it and never overwrites.
+  `.md`/`.markdown`/`.html`/`.htm`, no `..` or hidden segments. Linking an HTML
+  file also bundles its relative assets (CSS, JS, images, fonts, media) next
+  to it. A missing file only warns; `--create` scaffolds markdown only and
+  never overwrites.
 - Typed fields (`--status`, `--owner`, `--location`, `--line-style`,
   `--interaction-style`) are stored as properties in the DSL; see
   [c4hero-conventions.md](./references/c4hero-conventions.md).

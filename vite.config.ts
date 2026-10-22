@@ -5,9 +5,21 @@ import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 import path from 'path'
 import { execSync } from 'child_process'
-import { docRelativePath, docsRootFor, isInsideRootReal, listMarkdownFiles, resolveDocRequest } from './src/lib/docPath.ts'
+import {
+  contentTypeFor,
+  docRelativePath,
+  documentKind,
+  docsRootFor,
+  hasAssetExtension,
+  hasHiddenSegment,
+  isInsideRoot,
+  isInsideRootReal,
+  listDocumentFiles,
+  resolveDocRequest,
+} from './src/lib/docPath.ts'
 import { DOC_CHANGED_EVENT, type DocChange } from './src/lib/docLiveReload.ts'
 import { readFileSync, existsSync, statSync, readdirSync } from 'fs'
+import type { ServerResponse } from 'node:http'
 
 // Set by scripts/build-plugin.mjs: builds the headless export viewer into
 // plugins/c4hero/viewer/ (relative base, no PWA, no document collection, a
@@ -32,6 +44,33 @@ const LOCKED_WORKSPACE_RESOLVED_ID = '\0' + LOCKED_WORKSPACE_VIRTUAL_ID
 // build (`npm run build:viewer`) is a separate script/plugin pairing.
 const DOCS_MOUNT_PREFIX = '/__docs/'
 const DOCS_INDEX_NAME = '__index.json'
+
+// D2/D3: the iframe `sandbox` flags (HtmlDocumentFrame, Phase 3), repeated
+// here as a `Content-Security-Policy: sandbox …` response header so a raw
+// `/__docs/*.html` (or asset) request opened outside the iframe is isolated
+// too, on any host that can set response headers. Never add
+// `allow-same-origin` — see the plan's Security Considerations.
+const DOCS_SANDBOX_CSP =
+  'sandbox allow-scripts allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation'
+
+// Local mirror of `DocumentCopyPlan` (src/lib/documentCollection.ts) for the
+// dev middleware's typed access to the `ssrLoadModule`-loaded module below —
+// see the `closeBundle` hook's own typed `plan`/`writeDocumentCopies` locals
+// for why a plain `import` of that module can't be used here instead.
+interface DevDocumentCopyPlan {
+  copies: Array<{ from: string; to: string; kind: 'markdown' | 'html' | 'asset' }>
+  missing: string[]
+  warnings: string[]
+}
+
+// Shared by the dev middleware's `getPlan` and `closeBundle`: the `*.dsl`
+// files directly inside `dir` (non-recursive — matches `planDocumentCopies`'s
+// own expectation of one workspace's top-level DSL files), absolute paths.
+function listDslFiles(dir: string): string[] {
+  return readdirSync(dir)
+    .filter((name) => name.toLowerCase().endsWith('.dsl'))
+    .map((name) => path.join(dir, name))
+}
 
 // `closeBundle` runs after `tsc -b`'s separate pass, inside the already-
 // bundled `vite.config.ts` module — which means a plain `import` of
@@ -106,20 +145,116 @@ export default defineConfig({
         server.watcher.on('add', notifyDocChange('add'))
         server.watcher.on('unlink', notifyDocChange('unlink'))
 
+        // D5: dev serves an HTML document or asset only when the build would
+        // copy it too — computed by the same `planDocumentCopies`, from the
+        // dev workspace's `*.dsl` files, and cached until a change that could
+        // affect the plan invalidates it (below). A markdown edit can add or
+        // remove an HTML link (D6) or change which `[[wikilink]]` falls back
+        // to `.html` (D8), and an add/unlink of any document or asset changes
+        // which subresources exist to crawl — so any document/asset path
+        // under the docs root invalidates the cache, not just `.html`/`.css`.
+        let cachedPlan: DevDocumentCopyPlan | null = null
+        const invalidatePlanOn = (file: string): void => {
+          const lower = file.toLowerCase()
+          const isDsl = lower.endsWith('.dsl') && isInsideRoot(docsRoot, file)
+          if (isDsl || docRelativePath(docsRoot, file) !== null) cachedPlan = null
+        }
+        server.watcher.on('add', invalidatePlanOn)
+        server.watcher.on('change', invalidatePlanOn)
+        server.watcher.on('unlink', invalidatePlanOn)
+
+        // `documentCollection.ts` imports `@/store/workspace-helpers` and an
+        // extensionless `./dsl`, which a plain `import` here can't resolve
+        // (see the `closeBundle` hook's own comment on this); `htmlDocLinks.ts`
+        // imports `./docLinks` the same extensionless way. `ssrLoadModule`
+        // gives both their real alias/extension resolution instead.
+        let modulesPromise: Promise<{
+          planDocumentCopies: (dslFilePaths: string[], projectRoot: string) => DevDocumentCopyPlan
+          servedPaths: (plan: DevDocumentCopyPlan) => Set<string>
+          rewriteHtmlDocLinks: (html: string, docPath: string) => string
+        }> | null = null
+        const loadDocModules = () => {
+          modulesPromise ??= (async () => {
+            const collection = await server.ssrLoadModule('/src/lib/documentCollection.ts')
+            const htmlLinks = await server.ssrLoadModule('/src/lib/htmlDocLinks.ts')
+            const planDocumentCopies: (dslFilePaths: string[], projectRoot: string) => DevDocumentCopyPlan = collection.planDocumentCopies
+            const servedPaths: (plan: DevDocumentCopyPlan) => Set<string> = collection.servedPaths
+            const rewriteHtmlDocLinks: (html: string, docPath: string) => string = htmlLinks.rewriteHtmlDocLinks
+            return { planDocumentCopies, servedPaths, rewriteHtmlDocLinks }
+          })()
+          return modulesPromise
+        }
+
+        const getPlan = async (): Promise<DevDocumentCopyPlan> => {
+          if (cachedPlan) return cachedPlan
+          const { planDocumentCopies } = await loadDocModules()
+          const dslFilePaths = devWorkspace ? listDslFiles(devWorkspace) : []
+          cachedPlan = planDocumentCopies(dslFilePaths, docsRoot)
+          return cachedPlan
+        }
+
+        // HTML and asset responses (D5/D3): 404 unless the path is one the
+        // build would copy, else served with the sandbox CSP header. HTML is
+        // rewritten the same way `writeDocumentCopies` rewrites it for a
+        // build, so a `.md` link inside it opens `/document-view` here too.
+        const serveDocFileOrAsset = async (decoded: string, res: ServerResponse): Promise<void> => {
+          const absolute = path.resolve(docsRoot, decoded)
+          if (hasHiddenSegment(decoded) || !isInsideRoot(docsRoot, absolute)) {
+            res.statusCode = 400
+            res.end('Bad request')
+            return
+          }
+
+          const [plan, { servedPaths, rewriteHtmlDocLinks }] = await Promise.all([getPlan(), loadDocModules()])
+          const isServed =
+            servedPaths(plan).has(decoded) &&
+            existsSync(absolute) &&
+            statSync(absolute).isFile() &&
+            isInsideRootReal(docsRoot, absolute)
+          if (!isServed) {
+            res.statusCode = 404
+            res.end('Not found')
+            return
+          }
+
+          res.setHeader('Content-Security-Policy', DOCS_SANDBOX_CSP)
+          res.setHeader('X-Content-Type-Options', 'nosniff')
+          res.setHeader('Content-Type', contentTypeFor(decoded))
+          res.statusCode = 200
+          res.end(documentKind(decoded) === 'html' ? rewriteHtmlDocLinks(readFileSync(absolute, 'utf8'), decoded) : readFileSync(absolute))
+        }
+
         server.middlewares.use((req, res, next) => {
           if (!req.url || !req.url.startsWith(DOCS_MOUNT_PREFIX)) return next()
 
           const encodedPath = req.url.slice(DOCS_MOUNT_PREFIX.length).split('?')[0]
 
-          // Markdown file list for wikilink resolution. Can't collide with a
-          // document: those must end in .md/.markdown.
+          // Document file list for wikilink resolution (D8: markdown and
+          // HTML). Can't collide with a document path: those must end in
+          // .md/.markdown/.html/.htm.
           if (encodedPath === DOCS_INDEX_NAME) {
             res.statusCode = 200
             res.setHeader('Content-Type', 'application/json; charset=utf-8')
-            res.end(JSON.stringify(listMarkdownFiles(docsRoot)))
+            res.end(JSON.stringify(listDocumentFiles(docsRoot)))
             return
           }
 
+          let decoded: string
+          try {
+            decoded = decodeURIComponent(encodedPath)
+          } catch {
+            res.statusCode = 400
+            res.end('Bad request')
+            return
+          }
+
+          if (documentKind(decoded) === 'html' || hasAssetExtension(decoded)) {
+            serveDocFileOrAsset(decoded, res).catch(next)
+            return
+          }
+
+          // Markdown keeps today's rule: any .md/.markdown file under the
+          // docs root is served, independent of the DSL-derived plan.
           let absolute: string
           let rejected: boolean
           try {
@@ -161,9 +296,7 @@ export default defineConfig({
         const workspaceDir = process.env.DOCUMENT_WORKSPACE_DIR
         if (!workspaceDir) return
 
-        const dslFilePaths = readdirSync(workspaceDir)
-          .filter((name) => name.toLowerCase().endsWith('.dsl'))
-          .map((name) => path.join(workspaceDir, name))
+        const dslFilePaths = listDslFiles(workspaceDir)
 
         const server = await createServer({
           configFile: false,
@@ -174,8 +307,8 @@ export default defineConfig({
           logLevel: 'error',
         })
 
-        let plan: { copies: Array<{ from: string; to: string }>; missing: string[]; warnings: string[] }
-        let writeDocumentCopies: (plan: { copies: Array<{ from: string; to: string }> }, outDir: string) => void
+        let plan: DevDocumentCopyPlan
+        let writeDocumentCopies: (plan: Pick<DevDocumentCopyPlan, 'copies'>, outDir: string) => void
         try {
           const collection = await server.ssrLoadModule('/src/lib/documentCollection.ts')
           writeDocumentCopies = collection.writeDocumentCopies
@@ -219,7 +352,14 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,ico,woff,woff2}'],
-        globIgnores: ['**/c4-logo.svg', '**/favicon.svg'],
+        // `__docs/` is author-controlled document/asset output, never app
+        // shell: it must not be precached, and the SPA navigation fallback
+        // must not serve `index.html` for a direct/iframe navigation to it
+        // (see the plan's "Service worker" section and Security
+        // Considerations — the service worker could otherwise defeat the
+        // sandbox by answering the iframe's navigation with the app shell).
+        globIgnores: ['**/c4-logo.svg', '**/favicon.svg', '__docs/**'],
+        navigateFallbackDenylist: [/^\/__docs\//],
       },
       devOptions: { enabled: false },
     })]),

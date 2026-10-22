@@ -10,6 +10,10 @@ describe('resolveDocLink', () => {
   it('resolves a subfolder', () => {
     expect(resolveDocLink(cur, 'sub/x.markdown')).toEqual({ kind: 'doc', path: 'docs/guide/sub/x.markdown', fragment: '' })
   })
+  it('resolves an html/htm target', () => {
+    expect(resolveDocLink('docs/a.md', 'r.html#x')).toEqual({ kind: 'doc', path: 'docs/r.html', fragment: 'x' })
+    expect(resolveDocLink(cur, 'sub/x.htm')).toEqual({ kind: 'doc', path: 'docs/guide/sub/x.htm', fragment: '' })
+  })
   it('resolves ../', () => {
     expect(resolveDocLink(cur, '../x.md')).toEqual({ kind: 'doc', path: 'docs/x.md', fragment: '' })
   })
@@ -138,6 +142,11 @@ describe('resolveWikilink', () => {
       fragment: '',
     })
   })
+  it('falls back to .html only when no .md candidate matches', () => {
+    expect(resolveWikilink('a.md', 'r', ['r.md', 'r.html'])).toEqual({ kind: 'doc', path: 'r.md', fragment: '' })
+    expect(resolveWikilink('a.md', 'r', ['r.html'])).toEqual({ kind: 'doc', path: 'r.html', fragment: '' })
+    expect(resolveWikilink('a.md', 'r.html', ['r.md', 'r.html'])).toEqual({ kind: 'doc', path: 'r.html', fragment: '' })
+  })
   it('never resolves above the root', () => {
     const escaped = resolveWikilink('a.md', '../../etc/passwd', index)
     expect(escaped.kind).toBe('unresolved')
@@ -158,6 +167,10 @@ describe('extractDocLinks', () => {
     const { hrefs, wikilinks } = extractDocLinks(md)
     expect(hrefs).toEqual(expect.arrayContaining(['e.md', 'a.md#f', 'sub dir/b.md', 'img.png', 'd.md', 'c.md']))
     expect(wikilinks).toEqual(['W', 'Emb#H|x', 'A\\|B'])
+  })
+  it('matches <x.html> autolinks too', () => {
+    const { hrefs } = extractDocLinks('See <report.html> and <page.htm#frag>')
+    expect(hrefs).toEqual(expect.arrayContaining(['report.html', 'page.htm#frag']))
   })
   it('skips fenced code, and inline code for links and wikilinks', () => {
     const md = ['```', '[x](fenced.md) [[Fenced]] `f.md`', '```', '', '~~~md', '[[Tilde]]', '~~~', '', '`[[Inline]]` `[y](inline.md)` [z](real.md)'].join('\n')

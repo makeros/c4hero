@@ -2,7 +2,7 @@
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import type { DocLink, ModelElement, Relationship, Workspace } from '@/types/model'
-import { docPathProblem, isInsideRoot, isInsideRootReal } from '@/lib/docPath'
+import { docPathProblem, documentKind, isInsideRoot, isInsideRootReal } from '@/lib/docPath'
 import { boolFlag, flag, type ParsedArgs } from '../args'
 import { CliFailure } from '../errors'
 import { projectRootFor } from '../discover'
@@ -84,7 +84,7 @@ function commonSetup(args: ParsedArgs, ctx: CommandContext) {
   const ref = args.positionals[0]
   if (!ref) throw new CliFailure('USAGE', 'Missing <ref> (element ref or relationship ref).')
   const rawPath = flag(args, 'path')
-  if (!rawPath) throw new CliFailure('USAGE', 'Missing --path <repo-relative.md>.')
+  if (!rawPath) throw new CliFailure('USAGE', 'Missing --path <repo-relative.md|.html>.')
   const docPath = validatedPath(rawPath)
   const session = openForEdit(args, ctx)
   const target = resolveTarget(session.workspace(), ref, flag(args, 'match'))
@@ -99,7 +99,7 @@ const linkDoc: CommandModule = {
   name: 'link-doc',
   summary: 'Link a markdown document to an element or relationship',
   flags: { values: ['path', 'title', 'match'], booleans: ['create', ...MUTATING_BOOLEANS] },
-  usage: 'link-doc <ref|relRef> --path <repo-relative.md> [--title <text>] [--create] [--match <description>] [--file <dsl>] [--dry-run] [--force]',
+  usage: 'link-doc <ref|relRef> --path <repo-relative.md|.html> [--title <text>] [--create] [--match <description>] [--file <dsl>] [--dry-run] [--force]',
   run(args, ctx) {
     const { file, session, target, docPath, dryRun } = commonSetup(args, ctx)
     const warnings: string[] = []
@@ -108,10 +108,13 @@ const linkDoc: CommandModule = {
     if (!isInsideRoot(root, absolute) || !isInsideRootReal(root, absolute)) {
       throw new CliFailure('USAGE', `Document path '${docPath}' resolves outside the project root ${root}.`)
     }
+    if (boolFlag(args, 'create') && documentKind(docPath) !== 'markdown') {
+      throw new CliFailure('USAGE', `--create only scaffolds markdown; '${docPath}' is not a markdown path.`)
+    }
 
     const docs = currentDocs(target)
     const existing = docs.findIndex((d) => d.path === docPath)
-    const title = flag(args, 'title') ?? docs[existing]?.title ?? path.posix.basename(docPath).replace(/\.(md|markdown)$/i, '')
+    const title = flag(args, 'title') ?? docs[existing]?.title ?? path.posix.basename(docPath).replace(/\.(md|markdown|html|htm)$/i, '')
     const next = existing === -1 ? [...docs, { path: docPath, title }] : docs.map((d, i) => (i === existing ? { path: docPath, title } : d))
     setDocuments(target, next, session.actions())
 
@@ -152,7 +155,7 @@ const unlinkDoc: CommandModule = {
   name: 'unlink-doc',
   summary: 'Remove a document link from an element or relationship',
   flags: { values: ['path', 'match'], booleans: MUTATING_BOOLEANS },
-  usage: 'unlink-doc <ref|relRef> --path <repo-relative.md> [--match <description>] [--file <dsl>] [--dry-run] [--force]',
+  usage: 'unlink-doc <ref|relRef> --path <repo-relative.md|.html> [--match <description>] [--file <dsl>] [--dry-run] [--force]',
   run(args, ctx) {
     const { file, session, target, docPath, dryRun } = commonSetup(args, ctx)
     const docs = currentDocs(target)

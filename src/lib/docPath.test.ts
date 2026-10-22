@@ -3,18 +3,65 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSyn
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { docPathProblem, docRelativePath, docsRootFor, isInsideRoot, isInsideRootReal, listMarkdownFiles, resolveDocRequest } from './docPath'
+import {
+  contentTypeFor,
+  documentKind,
+  docPathProblem,
+  docRelativePath,
+  docsRootFor,
+  hasAssetExtension,
+  isInsideRoot,
+  isInsideRootReal,
+  listDocumentFiles,
+  listMarkdownFiles,
+  resolveDocRequest,
+} from './docPath'
+
+describe('documentKind', () => {
+  it('classifies by extension, case-insensitively', () => {
+    expect(documentKind('a/b.HTML')).toBe('html')
+    expect(documentKind('a.md')).toBe('markdown')
+    expect(documentKind('a.htm')).toBe('html')
+    expect(documentKind('a.markdown')).toBe('markdown')
+    expect(documentKind('a.css')).toBeNull()
+  })
+})
+
+describe('hasAssetExtension', () => {
+  it.each(['css', 'js', 'mjs', 'png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'avif', 'ico', 'woff', 'woff2', 'ttf', 'otf', 'mp4', 'webm', 'mp3', 'ogg'])(
+    'accepts .%s',
+    (ext) => expect(hasAssetExtension(`a.${ext}`)).toBe(true),
+  )
+  it.each(['json', 'map', 'wasm', 'ts', 'env'])('rejects .%s', (ext) => expect(hasAssetExtension(`a.${ext}`)).toBe(false))
+})
+
+describe('contentTypeFor', () => {
+  it('returns a markdown, html or asset content type by extension', () => {
+    expect(contentTypeFor('a.md')).toBe('text/markdown; charset=utf-8')
+    expect(contentTypeFor('a.html')).toBe('text/html; charset=utf-8')
+    expect(contentTypeFor('a.css')).toBe('text/css; charset=utf-8')
+    expect(contentTypeFor('a.png')).toBe('image/png')
+  })
+  it('falls back to application/octet-stream for anything unrecognised', () => {
+    expect(contentTypeFor('a.json')).toBe('application/octet-stream')
+  })
+})
 
 describe('docRelativePath', () => {
   const root = path.resolve('/repo')
-  it('returns the root-relative POSIX path of a markdown file under the root', () => {
+  it('returns the root-relative POSIX path of a document file under the root', () => {
     expect(docRelativePath(root, path.join(root, 'docs', 'a.md'))).toBe('docs/a.md')
     expect(docRelativePath(root, path.join(root, 'B.MARKDOWN'))).toBe('B.MARKDOWN')
+    expect(docRelativePath(root, path.join(root, 'docs', 'r.html'))).toBe('docs/r.html')
+  })
+  it('returns the root-relative POSIX path of an allowlisted asset, for watcher announcements', () => {
+    expect(docRelativePath(root, path.join(root, 'docs', 'r.css'))).toBe('docs/r.css')
+    expect(docRelativePath(root, path.join(root, 'docs', 'img', 'bg.png'))).toBe('docs/img/bg.png')
   })
   it.each([
     ['outside the root', path.resolve('/elsewhere/a.md')],
     ['a sibling with the root as name prefix', path.resolve('/repo-other/a.md')],
-    ['a non-markdown file', path.join(root, 'src', 'a.ts')],
+    ['a non-document, non-asset file', path.join(root, 'src', 'a.ts')],
     ['a hidden segment', path.join(root, '.github', 'a.md')],
     ['node_modules', path.join(root, 'node_modules', 'pkg', 'README.md')],
     ['the root itself', root],
@@ -22,9 +69,14 @@ describe('docRelativePath', () => {
 })
 
 describe('docPathProblem', () => {
-  it('accepts relative markdown paths', () => {
+  it('accepts relative markdown and html paths', () => {
     expect(docPathProblem('docs/a.md')).toBeNull()
     expect(docPathProblem('docs/A.MARKDOWN')).toBeNull()
+    expect(docPathProblem('docs/r.html')).toBeNull()
+    expect(docPathProblem('docs/r.htm')).toBeNull()
+  })
+  it('rejects a non-document extension', () => {
+    expect(docPathProblem('x.css')).not.toBeNull()
   })
   it.each(['../a.md', 'docs/../a.md', '/etc/a.md', 'C:\\a.md', 'docs/.hidden/a.md', '.a.md', 'docs/a.txt', 'a'])(
     'rejects %s',
@@ -156,5 +208,33 @@ describe('listMarkdownFiles', () => {
   })
   it('returns nothing for a missing root', () => {
     expect(listMarkdownFiles(path.join(root, 'nope'))).toEqual({ files: [], truncated: false })
+  })
+})
+
+describe('listDocumentFiles', () => {
+  let root: string
+  beforeEach(() => {
+    root = mkdtempSync(path.join(os.tmpdir(), 'listdoc-root-'))
+  })
+  afterEach(() => {
+    rmSync(root, { recursive: true, force: true })
+  })
+  const write = (rel: string) => {
+    mkdirSync(path.dirname(path.join(root, rel)), { recursive: true })
+    writeFileSync(path.join(root, rel), '')
+  }
+
+  it('lists markdown and html files, skipping hidden segments and node_modules', () => {
+    write('a.md')
+    write('docs/b.markdown')
+    write('docs/r.HTML')
+    write('docs/r.htm')
+    write('docs/r.css')
+    write('.hidden.html')
+    write('node_modules/pkg/index.html')
+    expect(listDocumentFiles(root)).toEqual({
+      files: ['a.md', 'docs/b.markdown', 'docs/r.HTML', 'docs/r.htm'],
+      truncated: false,
+    })
   })
 })

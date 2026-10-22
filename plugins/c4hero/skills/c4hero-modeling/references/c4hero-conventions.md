@@ -17,7 +17,7 @@ c4hero hoists these reserved keys from an element or relationship `properties` b
 | `c4hero.location` | person, software system | `Internal`, `External`. Externality is also carried by the `External` tag | `add --external`, `update --location` |
 | `c4hero.lineStyle` | relationship | `Curved`, `Straight`, `Orthogonal` | `relate`/`update-rel --line-style` |
 | `c4hero.interactionStyle` | relationship | `Synchronous`, `Asynchronous` | `--interaction-style` |
-| `c4hero.documents.<n>.path` | element, relationship | repo-relative `.md`/`.markdown` path | `link-doc` |
+| `c4hero.documents.<n>.path` | element, relationship | repo-relative `.md`/`.markdown`/`.html`/`.htm` path | `link-doc` |
 | `c4hero.documents.<n>.title` | element, relationship | link title | `link-doc --title` |
 
 Example:
@@ -37,13 +37,13 @@ Document links are indexed from 0 with no gaps, and each needs both `.path` and 
 
 ## Document links
 
-- A link points to a local markdown file inside the project: relative path, ends in `.md` or `.markdown`, no `..`, absolute or dot-prefixed segment. The CLI rejects anything else.
+- A link points to a local markdown or HTML file inside the project: relative path, ends in `.md`, `.markdown`, `.html` or `.htm`, no `..`, absolute or dot-prefixed segment. The CLI rejects anything else. Linking an HTML file bundles its relative assets (CSS, JS, images, fonts, media) next to it on export.
 - A relationship can carry links too (`link-doc 'orderService->postgres' --path ...`).
 - A missing file is only a warning in `link-doc` and `check` (`missing-document`).
-- `link-doc --create` scaffolds the file from the model and never overwrites. Replace the scaffold with real prose afterwards; the generated "Relationships" list is derived from the model and goes stale.
+- `link-doc --create` scaffolds the file from the model and never overwrites; it is markdown-only and fails with `USAGE` for an HTML path. Replace the scaffold with real prose afterwards; the generated "Relationships" list is derived from the model and goes stale.
 - Put docs in a stable folder (for example `docs/architecture/`) and one file per element; reuse one file for several elements only when they truly share the topic.
 
-**Links inside documents.** The viewer follows relative markdown links (`[x](other.md#heading)`), inline-code mentions of a `.md` path, and Obsidian wikilinks (`[[Name]]`, `[[Name|alias]]`, `[[Name#Heading]]`, `[[#Heading]]`, `![[Name]]` as a plain link). Wikilinks resolve by name, not path: first relative to the current document's folder, then from the project root, then any file with that name (same folder, then fewest path segments, then alphabetical). A target that exists nowhere is shown dimmed and opens "Document not found". Builds with `--workspace` (`npm run build`, `build:viewer`) copy every document the model links to plus, transitively, every document those link to, and write `__docs/__index.json` listing them; unresolved links are warnings, not failures.
+**Links inside documents.** The viewer follows relative markdown links (`[x](other.md#heading)`), inline-code mentions of a `.md` path, and Obsidian wikilinks (`[[Name]]`, `[[Name|alias]]`, `[[Name#Heading]]`, `[[#Heading]]`, `![[Name]]` as a plain link). Wikilinks resolve by name, not path: first relative to the current document's folder, then from the project root, then any file with that name (same folder, then fewest path segments, then alphabetical). A target that exists nowhere is shown dimmed and opens "Document not found". Builds with `--workspace` (`npm run build`, `build:viewer`) copy every document the model links to plus, transitively, every document those link to, and write `__docs/__index.json` listing them; unresolved links are warnings, not failures. HTML documents need a host that serves `.html` URLs as-is: the locked viewer (`build:viewer`) ships a `dist-viewer/serve.json` that turns off `serve`'s clean URLs, and other hosts that strip `.html` (for example Cloudflare Pages) need that turned off too.
 
 ## Sidecar `<name>.c4hero.json`
 

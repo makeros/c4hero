@@ -72,7 +72,16 @@ describe('link-doc / unlink-doc', () => {
     expect((r.data as { documents: unknown[] }).documents).toEqual([{ path: 'docs/a.md', title: 'Two' }])
   })
 
-  it.each(['../a.md', 'docs/../a.md', '/abs/a.md', 'docs/.hid/a.md', 'docs/a.txt'])('rejects %s', async (p) => {
+  it('accepts an html path, stripping the extension for the default title', async () => {
+    const r = await run('link-doc', element.id, '--path', 'docs/r.html')
+    expect((r.data as { documents: Array<{ path: string; title: string }> }).documents).toEqual([{ path: 'docs/r.html', title: 'r' }])
+  })
+
+  it('--create refuses an html path', async () => {
+    await expect(run('link-doc', element.id, '--path', 'docs/r.html', '--create')).rejects.toMatchObject({ code: 'USAGE' })
+  })
+
+  it.each(['../a.md', 'docs/../a.md', '/abs/a.md', 'docs/.hid/a.md', 'docs/a.txt', 'x.css'])('rejects %s', async (p) => {
     const before = dsl()
     await expect(run('link-doc', element.id, '--path', p)).rejects.toBeInstanceOf(CliFailure)
     expect(dsl()).toBe(before)

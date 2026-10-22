@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type MouseEvent } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { FileWarning, FileX } from 'lucide-react'
 import mermaid from 'mermaid'
@@ -6,7 +6,10 @@ import { renderMarkdownToSafeHtml } from '@/lib/markdown'
 import { HEADING_ID_PREFIX } from '@/lib/docLinks'
 import { fetchDocIndex, resetDocIndexCache } from '@/lib/docIndex'
 import { onDocChange } from '@/lib/docLiveReload'
+import { documentKind } from '@/lib/documentLinks'
 import { createLogger } from '@/lib/logger'
+import HtmlDocumentFrame from './HtmlDocumentFrame'
+import { StatusScreen } from './StatusScreen'
 
 const log = createLogger('DocumentView')
 
@@ -102,7 +105,10 @@ export default function DocumentView() {
   }, [title])
 
   useEffect(() => {
-    if (!path) return
+    // HTML documents are hosted raw by HtmlDocumentFrame, which does its own
+    // existence check — this effect's markdown fetch/render would be wasted
+    // work (and never rendered, since the component returns early below).
+    if (!path || documentKind(path) === 'html') return
     const docPath = path
 
     let cancelled = false
@@ -156,6 +162,10 @@ export default function DocumentView() {
         detail="This link is missing a document to open."
       />
     )
+  }
+
+  if (documentKind(path) === 'html') {
+    return <HtmlDocumentFrame path={path} title={title} hash={hash} />
   }
 
   if (state.status === 'not-found') {
@@ -292,42 +302,6 @@ export default function DocumentView() {
           padding: 6px 10px;
         }
       `}</style>
-    </div>
-  )
-}
-
-function StatusScreen({ icon, iconBackground, heading, detail }: {
-  icon: ReactNode
-  iconBackground: string
-  heading: string
-  detail: string
-}) {
-  return (
-    <div
-      role="alert"
-      style={{
-        position: 'fixed', inset: 0,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: 'var(--color-bg-primary)',
-        flexDirection: 'column', gap: 16,
-        padding: 24, textAlign: 'center',
-      }}
-    >
-      <div style={{
-        width: 48, height: 48, borderRadius: 12,
-        background: iconBackground,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}>
-        {icon}
-      </div>
-      <div>
-        <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: 6 }}>
-          {heading}
-        </div>
-        <div style={{ fontSize: 13, color: 'var(--color-text-muted)', maxWidth: 420, lineHeight: 1.5 }}>
-          {detail}
-        </div>
-      </div>
     </div>
   )
 }

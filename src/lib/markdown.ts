@@ -41,7 +41,7 @@ marked.use({
       renderer(token) {
         const inner = (token as unknown as { inner: string }).inner
         const { target, heading, alias } = parseWikilink(inner)
-        const name = docBasename(target).replace(/\.(md|markdown)$/i, '')
+        const name = docBasename(target).replace(/\.(md|markdown|html|htm)$/i, '')
         const text = alias || (target && heading ? `${name} > ${heading}` : name || heading)
         const raw = heading ? `${target}#${heading}` : target
         return `<a data-wikilink="${escapeHtml(raw)}">${escapeHtml(text)}</a>`

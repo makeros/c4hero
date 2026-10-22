@@ -60,6 +60,11 @@ describe('renderMarkdownToSafeHtml', () => {
     expect(html).toContain('<a href="img.png">')
   })
 
+  it('rewrites a markdown link to an html document', () => {
+    const html = renderMarkdownToSafeHtml('[x](r.html)', { docPath: 'a.md', index: ['a.md', 'r.html'] })
+    expect(html).toContain('<a href="/document-view?path=r.html')
+  })
+
   describe('inline-code document mentions', () => {
     const render = (md: string) => renderMarkdownToSafeHtml(md, { docPath: 'docs/a.md' })
     const link = (href: string, text: string) =>
@@ -81,6 +86,7 @@ describe('renderMarkdownToSafeHtml', () => {
       ['file.md.bak'],
       ['https://x/y.md'],
       ['npm run x'],
+      ['index.html'],
     ])('does not link `%s`', (text) => {
       expect(render(`See \`${text}\` here`)).not.toContain('doc-code-link')
     })
@@ -141,6 +147,11 @@ describe('wikilinks', () => {
     expect(a.classList.contains('doc-link-unresolved')).toBe(true)
     expect(a.getAttribute('title')).toBe('Not found: Company profile')
     expect(a.getAttribute('href')).toBe('/document-view?path=standards%2FCompany+profile.md&title=Company+profile')
+  })
+
+  it('strips .html/.htm from a wikilink label', () => {
+    const html = renderMarkdownToSafeHtml('[[report.html]] [[notes.htm]]', { docPath: 'a.md', index: ['report.html', 'notes.htm'] })
+    expect(anchors(html).map((a) => a.textContent)).toEqual(['report', 'notes'])
   })
 
   it('falls back to the relative path without an index', () => {
