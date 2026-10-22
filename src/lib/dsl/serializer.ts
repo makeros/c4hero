@@ -430,6 +430,15 @@ class SerializerContext {
     }
 
     /**
+     * Properties to emit for a deployment or infrastructure node: only
+     * `documents` is field-encoded, with the same whole-namespace
+     * `c4hero.documents.*` clear-and-replace as elementProperties().
+     */
+    private deploymentElementProperties(el: DeploymentNode | InfrastructureNode): Record<string, string> {
+        return { ...withoutDocumentProperties(el.properties), ...documentsToProperties(el.documents) }
+    }
+
+    /**
      * Merge derived (field-encoded) keys ahead of user properties. A reserved
      * key always occupies its leading slot — filled from the field when set
      * (deliberately winning over a colliding user property), else from a user
@@ -608,7 +617,8 @@ class SerializerContext {
     private serializeDeploymentNode(node: DeploymentNode): void {
         const varName = this.idToVar.get(node.id)
         const extraTags = this.getExtraTags(node.tags, ['Element', 'Deployment Node'])
-        const hasProperties = Object.keys(node.properties).length > 0
+        const properties = this.deploymentElementProperties(node)
+        const hasProperties = Object.keys(properties).length > 0
 
         const parts: string[] = []
         parts.push('deploymentNode')
@@ -627,7 +637,7 @@ class SerializerContext {
 
         if (node.instances !== undefined) this.emit(`instances ${/^\d+$/.test(node.instances) ? node.instances : `"${this.escapeString(node.instances)}"`}`)
         if (node.url) this.emit(`url "${this.escapeString(node.url)}"`)
-        if (hasProperties) this.serializeProperties(node.properties)
+        if (hasProperties) this.serializeProperties(properties)
 
         for (const infra of node.infrastructureNodes) {
             this.serializeInfrastructureNode(infra)
@@ -649,7 +659,8 @@ class SerializerContext {
     private serializeInfrastructureNode(infra: InfrastructureNode): void {
         const varName = this.idToVar.get(infra.id)
         const extraTags = this.getExtraTags(infra.tags, ['Element', 'Infrastructure Node'])
-        const hasProperties = Object.keys(infra.properties).length > 0
+        const properties = this.deploymentElementProperties(infra)
+        const hasProperties = Object.keys(properties).length > 0
         const hasBlock = !!infra.url || hasProperties
 
         const parts: string[] = []
@@ -668,7 +679,7 @@ class SerializerContext {
             this.emit(`${prefix}${parts.join(' ')} {`)
             this.depth++
             if (infra.url) this.emit(`url "${this.escapeString(infra.url)}"`)
-            if (hasProperties) this.serializeProperties(infra.properties)
+            if (hasProperties) this.serializeProperties(properties)
             this.depth--
             this.emit('}')
         } else {

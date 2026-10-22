@@ -17,6 +17,7 @@ import type {
 import type { ContextAwareParser } from './parser'
 import { nextId, MAX_DEPTH } from './parser'
 import { parseRelationship } from './parser-relationship'
+import { parseDocumentsFromProperties } from './documentLinks'
 
 export function parseDeploymentEnvironment(p: ContextAwareParser, model: Model, varName?: string): void {
     p.advance() // consume 'deploymentEnvironment'
@@ -163,7 +164,16 @@ function parseDeploymentNode(p: ContextAwareParser, model: Model, varName?: stri
         p.expect('RBRACE')
     }
 
+    hoistDocuments(node)
     return node
+}
+
+/** Hoist `c4hero.documents.<n>.*` properties onto `documents`, like
+ *  applyStructurizrConventions does for model elements. */
+function hoistDocuments(element: DeploymentNode | InfrastructureNode): void {
+    const { documents, rest } = parseDocumentsFromProperties(element.properties)
+    if (documents !== undefined) element.documents = documents
+    element.properties = rest
 }
 
 function parseDeploymentNodeBody(p: ContextAwareParser, node: DeploymentNode, model: Model): void {
@@ -323,6 +333,7 @@ function parseInfrastructureNode(p: ContextAwareParser, varName?: string): Infra
         p.expect('RBRACE')
     }
 
+    hoistDocuments(infra)
     return infra
 }
 

@@ -57,6 +57,20 @@ describe('findReferencedDocumentPaths', () => {
         expect(findReferencedDocumentPaths([w])).toEqual(['docs/a.md', 'docs/b.md'])
     })
 
+    it('collects references on deployment and infrastructure nodes', () => {
+        const w = ws({
+            deploymentEnvironments: [{
+                id: 'e1', name: 'Prod',
+                deploymentNodes: [{
+                    id: 'n1', type: 'deploymentNode', name: 'AWS', tags: [], properties: {}, documents: [DOC_A],
+                    children: [], containerInstances: [], softwareSystemInstances: [],
+                    infrastructureNodes: [{ id: 'i1', type: 'infrastructureNode', name: 'LB', tags: [], properties: {}, documents: [DOC_B] }],
+                }],
+            }],
+        })
+        expect(findReferencedDocumentPaths([w])).toEqual(['docs/a.md', 'docs/b.md'])
+    })
+
     it('dedupes a path referenced by more than one element', () => {
         const w = ws({
             people: [

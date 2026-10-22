@@ -12,15 +12,15 @@ import { extractDocLinks, resolveDocLink, resolveWikilink } from './docLinks'
 import { extractCssUrls, extractHtmlReferences, rewriteHtmlDocLinks } from './htmlDocLinks'
 import { parseDSL } from './dsl'
 import { forEachElementHelper } from '@/store/workspace-helpers'
+import { walkDeploymentNodes } from '@/lib/deployment'
 import type { Workspace } from '@/types/model'
 
 /**
  * Collect every `documents[].path` referenced anywhere across the given
  * workspaces — every element in the model tree (people, software systems,
- * their containers, those containers' components — mirrors
- * `forEachElementHelper`'s traversal exactly, so deployment-view elements are
- * out of scope here too, matching Task 1.1's `documents` scope) plus every
- * relationship. Deduped, first-seen order preserved.
+ * their containers, those containers' components), every deployment and
+ * infrastructure node, plus every relationship. Deduped, first-seen order
+ * preserved.
  */
 export function findReferencedDocumentPaths(workspaces: Workspace[]): string[] {
     const seen = new Set<string>()
@@ -35,6 +35,14 @@ export function findReferencedDocumentPaths(workspaces: Workspace[]): string[] {
         forEachElementHelper(ws, (el) => {
             for (const doc of el.documents ?? []) add(doc.path)
         })
+        for (const env of ws.model.deploymentEnvironments ?? []) {
+            walkDeploymentNodes(env, (node) => {
+                for (const doc of node.documents ?? []) add(doc.path)
+                for (const infra of node.infrastructureNodes) {
+                    for (const doc of infra.documents ?? []) add(doc.path)
+                }
+            })
+        }
         for (const rel of ws.model.relationships) {
             for (const doc of rel.documents ?? []) add(doc.path)
         }

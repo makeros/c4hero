@@ -130,3 +130,28 @@ describe('link-doc / unlink-doc', () => {
     await expect(run('unlink-doc', element.id, '--path', 'docs/none.md')).rejects.toMatchObject({ code: 'NOT_FOUND' })
   })
 })
+
+describe('link-doc on deployment elements', () => {
+  beforeEach(() => {
+    const copy = createBigBankSample()
+    copy.model.deploymentEnvironments = [{
+      id: 'prod', name: 'Production',
+      deploymentNodes: [{
+        id: 'awsNode', type: 'deploymentNode', name: 'AWS', tags: ['Element', 'Deployment Node'], properties: {},
+        children: [], containerInstances: [], softwareSystemInstances: [],
+        infrastructureNodes: [{ id: 'lbNode', type: 'infrastructureNode', name: 'LB', tags: ['Element', 'Infrastructure Node'], properties: {} }],
+      }],
+    }]
+    writeFileSync(file, serializeDSL(copy))
+  })
+
+  it('links and unlinks documents on deployment and infrastructure nodes by id', async () => {
+    const node = await run('link-doc', 'awsNode', '--path', 'docs/aws.md', '--title', 'AWS')
+    expect(node.data).toMatchObject({ target: 'awsNode', documents: [{ path: 'docs/aws.md', title: 'AWS' }] })
+    await run('link-doc', 'lbNode', '--path', 'docs/lb.md', '--title', 'LB')
+    expect(dsl()).toContain('docs/aws.md')
+    expect(dsl()).toContain('docs/lb.md')
+    await run('unlink-doc', 'lbNode', '--path', 'docs/lb.md')
+    expect(dsl()).not.toContain('docs/lb.md')
+  })
+})

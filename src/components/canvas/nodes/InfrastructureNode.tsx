@@ -3,6 +3,7 @@ import { type NodeProps } from '@xyflow/react'
 import type { InfrastructureNode as InfraNodeModel } from '@/types/model'
 import { Server } from 'lucide-react'
 import NodeHandles from './NodeHandles'
+import DocumentIndicator from '../DocumentIndicator'
 
 export interface InfrastructureNodeData {
   infra: InfraNodeModel
@@ -66,6 +67,18 @@ function InfrastructureNode({ data }: NodeProps & { data: InfrastructureNodeData
           </span>
         ))}
       </div>
+
+      {infra.documents && infra.documents.length > 0 && (
+        <div className="c4-node-footer">
+          <DocumentIndicator
+            documents={infra.documents}
+            subject={infra.name}
+            color="var(--color-type-infra, var(--color-text-muted))"
+            size={15}
+            className="c4-node-footer-btn"
+          />
+        </div>
+      )}
 
       <NodeHandles />
     </div>

@@ -1,6 +1,6 @@
 import type {
   Workspace, ModelElement, Relationship, Group,
-  ViewType, ElementStatus,
+  ViewType, ElementStatus, DocLink,
 } from '@/types/model'
 import type { ScopeViolation } from '@/lib/scopeValidation'
 import type { AiFeatureId } from '@/lib/ai/types'
@@ -197,7 +197,7 @@ export interface WorkspaceState extends UndoState {
   /** Patch a deployment node's / infrastructure node's editable fields from the
    *  inspector. A blank name is ignored (deployment elements must stay named);
    *  blank technology/description clear the field. */
-  updateDeploymentElement: (environment: string, id: string, patch: { name?: string; technology?: string; description?: string }) => void
+  updateDeploymentElement: (environment: string, id: string, patch: { name?: string; technology?: string; description?: string; documents?: DocLink[] }) => void
 
   // View management
   addView: (type: ViewType, scopeId?: string, title?: string, options?: { environment?: string }) => string

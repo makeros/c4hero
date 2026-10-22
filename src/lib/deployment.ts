@@ -6,6 +6,7 @@
 
 import type {
     Model,
+    DocLink,
     DeploymentEnvironment,
     DeploymentNode,
     ElementInView,
@@ -184,6 +185,7 @@ export interface DeploymentBoundarySpec {
     /** Content leaf node ids anywhere in this node's subtree. Boundary geometry
      *  is the union of these members' rects. */
     memberIds: string[]
+    documents?: DocLink[]
 }
 
 /** One boundary spec per deployment node that has at least one visible leaf in
@@ -200,7 +202,7 @@ export function buildDeploymentBoundarySpecs(
             const typeLabel = node.technology
                 ? (instanceCount ? `${node.technology} · ×${instanceCount}` : node.technology)
                 : (instanceCount ? `Deployment Node · ×${instanceCount}` : 'Deployment Node')
-            specs.push({ id: node.id, name: node.name, typeLabel, depth, memberIds })
+            specs.push({ id: node.id, name: node.name, typeLabel, depth, memberIds, documents: node.documents })
         }
         for (const child of node.children) visit(child, depth + 1)
     }

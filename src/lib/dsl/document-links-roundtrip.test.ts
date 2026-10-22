@@ -341,3 +341,57 @@ workspace {
     expect(dslAfterSecondSave).toBe(dslAfterFirstSave)
   })
 })
+
+describe('document links on deployment elements', () => {
+  const DSL = `workspace {
+    model {
+        sys = softwareSystem "App"
+        prod = deploymentEnvironment "Production" {
+            aws = deploymentNode "AWS" {
+                properties {
+                    "c4hero.documents.0.path" "infra/aws.md"
+                    "c4hero.documents.0.title" "AWS account"
+                }
+                lb = infrastructureNode "Load Balancer" {
+                    properties {
+                        "c4hero.documents.0.path" "runbooks/lb.md"
+                        "c4hero.documents.0.title" "LB runbook"
+                        "team" "platform"
+                    }
+                }
+            }
+        }
+    }
+}
+`
+
+  it('hoists documents on deployment and infrastructure nodes', () => {
+    const { workspace, errors } = parseDSL(DSL)
+    expect(errors).toEqual([])
+    const node = workspace.model.deploymentEnvironments[0].deploymentNodes[0]
+    expect(node.documents).toEqual([{ path: 'infra/aws.md', title: 'AWS account' }])
+    expect(node.properties).toEqual({})
+    const infra = node.infrastructureNodes[0]
+    expect(infra.documents).toEqual([{ path: 'runbooks/lb.md', title: 'LB runbook' }])
+    expect(infra.properties).toEqual({ team: 'platform' })
+  })
+
+  it('serializes edited documents and stays stable across reloads', () => {
+    const { workspace } = parseDSL(DSL)
+    const node = workspace.model.deploymentEnvironments[0].deploymentNodes[0]
+    node.documents = [...node.documents!, { path: 'infra/network.md', title: 'Network' }]
+    node.infrastructureNodes[0].documents = undefined
+
+    const once = serializeDSL(workspace)
+    const { workspace: reloaded, errors } = parseDSL(once)
+    expect(errors).toEqual([])
+    const reNode = reloaded.model.deploymentEnvironments[0].deploymentNodes[0]
+    expect(reNode.documents).toEqual([
+      { path: 'infra/aws.md', title: 'AWS account' },
+      { path: 'infra/network.md', title: 'Network' },
+    ])
+    expect(reNode.infrastructureNodes[0].documents).toBeUndefined()
+    expect(reNode.infrastructureNodes[0].properties).toEqual({ team: 'platform' })
+    expect(serializeDSL(reloaded)).toBe(once)
+  })
+})

@@ -1,7 +1,8 @@
 /// <reference types="node" />
 import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import type { Workspace } from '@/types/model'
+import type { DocLink, Workspace } from '@/types/model'
+import { walkDeploymentNodes } from '@/lib/deployment'
 import { serializeDSL } from '@/lib/dsl'
 import { applyEditPlan, summarizeSkips, type AppliedOp, type EditActions } from '@/lib/ai/operations'
 import { MAX_PLAN_OPS, isEditOp, sanitizeEditOp } from '@/lib/ai/schema'
@@ -147,7 +148,10 @@ function orphans(ws: Workspace): Finding[] {
 
 function missingDocuments(ws: Workspace, root: string): Finding[] {
   const out: Finding[] = []
-  const holders = [...allElements(ws), ...ws.model.relationships]
+  const holders: { id: string; documents?: DocLink[] }[] = [...allElements(ws), ...ws.model.relationships]
+  for (const env of ws.model.deploymentEnvironments ?? []) {
+    walkDeploymentNodes(env, (node) => holders.push(node, ...node.infrastructureNodes))
+  }
   for (const h of holders) {
     for (const doc of h.documents ?? []) {
       const abs = path.resolve(root, doc.path)

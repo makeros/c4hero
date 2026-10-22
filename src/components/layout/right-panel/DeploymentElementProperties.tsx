@@ -2,6 +2,7 @@ import { useWorkspaceStore } from '@/store/workspace'
 import type { SelectedDeploymentElement } from '@/store/workspace-selectors'
 import { X, Trash2, ArrowRight } from 'lucide-react'
 import { FieldLabel, EditableField } from './fields'
+import DocumentsTab from './DocumentsTab'
 
 const KIND_LABELS: Record<SelectedDeploymentElement['kind'], string> = {
   deploymentNode: 'Deployment Node',
@@ -13,7 +14,7 @@ const KIND_LABELS: Record<SelectedDeploymentElement['kind'], string> = {
 /** Inspector body for deployment elements (nodes, infrastructure nodes, and
  *  container / system instances). They live outside the C4 element tree, so
  *  ElementProperties can't render them; nodes and infra get editable
- *  name/technology/description, instances point back at what they deploy. */
+ *  name/technology/description/documents, instances point back at what they deploy. */
 export default function DeploymentElementProperties({ sel, onClose }: {
   sel: SelectedDeploymentElement
   onClose: () => void
@@ -100,6 +101,13 @@ export default function DeploymentElementProperties({ sel, onClose }: {
                 aria-label="Deployment element description"
                 onCommit={(v) => updateDeploymentElement(sel.environment, id, { description: v })}
                 multiline
+              />
+            </div>
+            <div>
+              <FieldLabel>Documents</FieldLabel>
+              <DocumentsTab
+                documents={sel.element.documents ?? []}
+                onUpdate={(documents) => updateDeploymentElement(sel.environment, id, { documents })}
               />
             </div>
           </div>

@@ -1,7 +1,8 @@
 /// <reference types="node" />
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import type { DocLink, ModelElement, Relationship, Workspace } from '@/types/model'
+import type { DeploymentNode, DocLink, InfrastructureNode, ModelElement, Relationship, Workspace } from '@/types/model'
+import { walkDeploymentNodes } from '@/lib/deployment'
 import { docPathProblem, documentKind, isInsideRoot, isInsideRootReal } from '@/lib/docPath'
 import { boolFlag, flag, type ParsedArgs } from '../args'
 import { CliFailure } from '../errors'
@@ -15,6 +16,20 @@ import { MUTATING_BOOLEANS, type CommandContext, type CommandModule } from './ty
 type Target =
   | { kind: 'element'; element: ModelElement }
   | { kind: 'relationship'; relationship: Relationship }
+  | { kind: 'deployment'; environment: string; element: DeploymentNode | InfrastructureNode }
+
+/** Deployment and infrastructure nodes, matched by identifier only. */
+function findDeploymentElement(ws: Workspace, ref: string): Target | undefined {
+  for (const env of ws.model.deploymentEnvironments ?? []) {
+    let found: DeploymentNode | InfrastructureNode | undefined
+    walkDeploymentNodes(env, (node) => {
+      if (node.id === ref) found = node
+      found ??= node.infrastructureNodes.find((i) => i.id === ref)
+    })
+    if (found) return { kind: 'deployment', environment: env.name, element: found }
+  }
+  return undefined
+}
 
 function resolveTarget(ws: Workspace, ref: string, match?: string): Target {
   if (ref.includes('->')) return { kind: 'relationship', relationship: resolveRelationship(ws, ref, match) }
@@ -25,6 +40,8 @@ function resolveTarget(ws: Workspace, ref: string, match?: string): Target {
     if (ws.model.relationships.some((r) => r.id === ref)) {
       return { kind: 'relationship', relationship: resolveRelationship(ws, ref, match) }
     }
+    const deployment = findDeploymentElement(ws, ref)
+    if (deployment) return deployment
     throw err
   }
 }
@@ -43,7 +60,7 @@ function scaffold(ws: Workspace, target: Target): string {
     return el ? el.name : id
   }
   const lines: string[] = []
-  if (target.kind === 'element') {
+  if (target.kind !== 'relationship') {
     const el = target.element
     lines.push(`# ${el.name}`, '')
     if (el.description) lines.push(el.description, '')
@@ -69,15 +86,16 @@ function scaffold(ws: Workspace, target: Target): string {
 
 function setDocuments(target: Target, documents: DocLink[], actions: WorkspaceState): void {
   if (target.kind === 'element') actions.updateElement(target.element.id, { documents })
+  else if (target.kind === 'deployment') actions.updateDeploymentElement(target.environment, target.element.id, { documents })
   else actions.updateRelationship(target.relationship.id, { documents })
 }
 
 function targetId(target: Target): string {
-  return target.kind === 'element' ? target.element.id : target.relationship.id
+  return target.kind === 'relationship' ? target.relationship.id : target.element.id
 }
 
 function changedOf(target: Target): CliResult['changed'] {
-  return target.kind === 'element' ? { elements: [target.element.id] } : { relationships: [target.relationship.id] }
+  return target.kind === 'relationship' ? { relationships: [target.relationship.id] } : { elements: [target.element.id] }
 }
 
 function commonSetup(args: ParsedArgs, ctx: CommandContext) {
@@ -92,7 +110,7 @@ function commonSetup(args: ParsedArgs, ctx: CommandContext) {
 }
 
 function currentDocs(target: Target): DocLink[] {
-  return (target.kind === 'element' ? target.element.documents : target.relationship.documents) ?? []
+  return (target.kind === 'relationship' ? target.relationship.documents : target.element.documents) ?? []
 }
 
 const linkDoc: CommandModule = {

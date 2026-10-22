@@ -1,6 +1,8 @@
 import { memo } from 'react'
 import type { NodeProps } from '@xyflow/react'
 import { useWorkspaceStore } from '@/store/workspace'
+import type { DocLink } from '@/types/model'
+import DocumentIndicator from '../DocumentIndicator'
 
 interface BoundaryNodeData {
   name: string
@@ -9,6 +11,8 @@ interface BoundaryNodeData {
   /** Set on deployment-node boundaries: clicking the label selects the node
    *  so the inspector can edit its name / technology / description. */
   deploymentNodeId?: string
+  /** Deployment-node boundaries: the node's linked documents. */
+  documents?: DocLink[]
 }
 
 function BoundaryNode({ data, selected }: NodeProps & { data: BoundaryNodeData }) {
@@ -41,14 +45,19 @@ function BoundaryNode({ data, selected }: NodeProps & { data: BoundaryNodeData }
           userSelect: 'none',
         }}
       >
-        <span style={{
-          fontSize: 'var(--text-xs-plus)',
-          fontWeight: 700,
-          color: 'var(--canvas-boundary-title, var(--color-text-dim))',
-          letterSpacing: '0.02em',
-          whiteSpace: 'nowrap',
-        }}>
-          {data.name}
+        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span style={{
+            fontSize: 'var(--text-xs-plus)',
+            fontWeight: 700,
+            color: 'var(--canvas-boundary-title, var(--color-text-dim))',
+            letterSpacing: '0.02em',
+            whiteSpace: 'nowrap',
+          }}>
+            {data.name}
+          </span>
+          {data.documents && data.documents.length > 0 && (
+            <DocumentIndicator documents={data.documents} subject={data.name} />
+          )}
         </span>
         <span style={{
           fontSize: 'var(--text-xxs)',
