@@ -3938,11 +3938,13 @@ var createDeploymentSlice = (set, get) => ({
 		if (name && name !== target.name) changed = true;
 		if ("technology" in patch && patch.technology !== target.technology) changed = true;
 		if ("description" in patch && patch.description !== target.description) changed = true;
+		if ("documents" in patch && patch.documents !== target.documents) changed = true;
 		if (!changed) return;
 		pushUndoSnapshot(s);
 		if (name) target.name = name;
 		if ("technology" in patch) target.technology = patch.technology || void 0;
 		if ("description" in patch) target.description = patch.description || void 0;
+		if ("documents" in patch) target.documents = patch.documents?.length ? patch.documents : void 0;
 	}),
 	renameDeploymentElement: (environment, id, name) => set((s) => {
 		if (s.readOnly) return;
@@ -5162,7 +5164,15 @@ function parseDeploymentNode(p, model, varName) {
 		p.skipNewlines();
 		p.expect("RBRACE");
 	}
+	hoistDocuments(node);
 	return node;
+}
+/** Hoist `c4hero.documents.<n>.*` properties onto `documents`, like
+*  applyStructurizrConventions does for model elements. */
+function hoistDocuments(element) {
+	const { documents, rest } = parseDocumentsFromProperties(element.properties);
+	if (documents !== void 0) element.documents = documents;
+	element.properties = rest;
 }
 function parseDeploymentNodeBody(p, node, model) {
 	p.depth++;
@@ -5310,6 +5320,7 @@ function parseInfrastructureNode(p, varName) {
 		p.skipNewlines();
 		p.expect("RBRACE");
 	}
+	hoistDocuments(infra);
 	return infra;
 }
 /** Parse `containerInstance <ref>` / `softwareSystemInstance <ref>` including
@@ -6782,6 +6793,17 @@ var SerializerContext = class {
 		};
 	}
 	/**
+	* Properties to emit for a deployment or infrastructure node: only
+	* `documents` is field-encoded, with the same whole-namespace
+	* `c4hero.documents.*` clear-and-replace as elementProperties().
+	*/
+	deploymentElementProperties(el) {
+		return {
+			...withoutDocumentProperties(el.properties),
+			...documentsToProperties(el.documents)
+		};
+	}
+	/**
 	* Merge derived (field-encoded) keys ahead of user properties. A reserved
 	* key always occupies its leading slot — filled from the field when set
 	* (deliberately winning over a colliding user property), else from a user
@@ -6903,7 +6925,8 @@ var SerializerContext = class {
 	serializeDeploymentNode(node) {
 		const varName = this.idToVar.get(node.id);
 		const extraTags = this.getExtraTags(node.tags, ["Element", "Deployment Node"]);
-		const hasProperties = Object.keys(node.properties).length > 0;
+		const properties = this.deploymentElementProperties(node);
+		const hasProperties = Object.keys(properties).length > 0;
 		const parts = [];
 		parts.push("deploymentNode");
 		parts.push(`"${this.escapeString(node.name)}"`);
@@ -6915,7 +6938,7 @@ var SerializerContext = class {
 		this.depth++;
 		if (node.instances !== void 0) this.emit(`instances ${/^\d+$/.test(node.instances) ? node.instances : `"${this.escapeString(node.instances)}"`}`);
 		if (node.url) this.emit(`url "${this.escapeString(node.url)}"`);
-		if (hasProperties) this.serializeProperties(node.properties);
+		if (hasProperties) this.serializeProperties(properties);
 		for (const infra of node.infrastructureNodes) this.serializeInfrastructureNode(infra);
 		for (const inst of node.softwareSystemInstances) this.serializeElementInstance("softwareSystemInstance", inst.id, inst.softwareSystemId, inst.tags, ["Software System Instance"], inst.url, inst.properties);
 		for (const inst of node.containerInstances) this.serializeElementInstance("containerInstance", inst.id, inst.containerId, inst.tags, ["Container Instance"], inst.url, inst.properties);
@@ -6926,7 +6949,8 @@ var SerializerContext = class {
 	serializeInfrastructureNode(infra) {
 		const varName = this.idToVar.get(infra.id);
 		const extraTags = this.getExtraTags(infra.tags, ["Element", "Infrastructure Node"]);
-		const hasProperties = Object.keys(infra.properties).length > 0;
+		const properties = this.deploymentElementProperties(infra);
+		const hasProperties = Object.keys(properties).length > 0;
 		const hasBlock = !!infra.url || hasProperties;
 		const parts = [];
 		parts.push("infrastructureNode");
@@ -6939,7 +6963,7 @@ var SerializerContext = class {
 			this.emit(`${prefix}${parts.join(" ")} {`);
 			this.depth++;
 			if (infra.url) this.emit(`url "${this.escapeString(infra.url)}"`);
-			if (hasProperties) this.serializeProperties(infra.properties);
+			if (hasProperties) this.serializeProperties(properties);
 			this.depth--;
 			this.emit("}");
 		} else this.emit(`${prefix}${parts.join(" ")}`);
@@ -8289,6 +8313,21 @@ var deploymentCommands = [{
 }];
 //#endregion
 //#region src/cli/commands/docs.ts
+/** Deployment and infrastructure nodes, matched by identifier only. */
+function findDeploymentElement(ws, ref) {
+	for (const env of ws.model.deploymentEnvironments ?? []) {
+		let found;
+		walkDeploymentNodes(env, (node) => {
+			if (node.id === ref) found = node;
+			found ??= node.infrastructureNodes.find((i) => i.id === ref);
+		});
+		if (found) return {
+			kind: "deployment",
+			environment: env.name,
+			element: found
+		};
+	}
+}
 function resolveTarget(ws, ref, match) {
 	if (ref.includes("->")) return {
 		kind: "relationship",
@@ -8305,6 +8344,8 @@ function resolveTarget(ws, ref, match) {
 			kind: "relationship",
 			relationship: resolveRelationship(ws, ref, match)
 		};
+		const deployment = findDeploymentElement(ws, ref);
+		if (deployment) return deployment;
 		throw err;
 	}
 }
@@ -8319,7 +8360,7 @@ function scaffold(ws, target) {
 		return el ? el.name : id;
 	};
 	const lines = [];
-	if (target.kind === "element") {
+	if (target.kind !== "relationship") {
 		const el = target.element;
 		lines.push(`# ${el.name}`, "");
 		if (el.description) lines.push(el.description, "");
@@ -8344,13 +8385,14 @@ function scaffold(ws, target) {
 }
 function setDocuments(target, documents, actions) {
 	if (target.kind === "element") actions.updateElement(target.element.id, { documents });
+	else if (target.kind === "deployment") actions.updateDeploymentElement(target.environment, target.element.id, { documents });
 	else actions.updateRelationship(target.relationship.id, { documents });
 }
 function targetId(target) {
-	return target.kind === "element" ? target.element.id : target.relationship.id;
+	return target.kind === "relationship" ? target.relationship.id : target.element.id;
 }
 function changedOf(target) {
-	return target.kind === "element" ? { elements: [target.element.id] } : { relationships: [target.relationship.id] };
+	return target.kind === "relationship" ? { relationships: [target.relationship.id] } : { elements: [target.element.id] };
 }
 function commonSetup(args, ctx) {
 	const ref = args.positionals[0];
@@ -8369,7 +8411,7 @@ function commonSetup(args, ctx) {
 	};
 }
 function currentDocs(target) {
-	return (target.kind === "element" ? target.element.documents : target.relationship.documents) ?? [];
+	return (target.kind === "relationship" ? target.relationship.documents : target.element.documents) ?? [];
 }
 var docsCommands = [{
 	name: "link-doc",
@@ -12424,6 +12466,7 @@ function orphans(ws) {
 function missingDocuments(ws, root) {
 	const out = [];
 	const holders = [...allElements(ws), ...ws.model.relationships];
+	for (const env of ws.model.deploymentEnvironments ?? []) walkDeploymentNodes(env, (node) => holders.push(node, ...node.infrastructureNodes));
 	for (const h of holders) for (const doc of h.documents ?? []) {
 		const abs = path.resolve(root, doc.path);
 		const rel = path.relative(root, abs);
