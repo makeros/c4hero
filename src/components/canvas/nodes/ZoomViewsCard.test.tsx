@@ -1,5 +1,5 @@
 import { render, screen, fireEvent } from '@testing-library/react'
-import ZoomHoverCard from './ZoomHoverCard'
+import ZoomViewsCard from './ZoomViewsCard'
 import { useWorkspaceStore } from '@/store/workspace'
 import type { Workspace, ModelElement } from '@/types/model'
 
@@ -69,10 +69,10 @@ function loadWs() {
   useWorkspaceStore.setState({ activeViewKey: 'cv-1', viewHistory: [] })
 }
 
-describe('ZoomHoverCard for a software system', () => {
+describe('ZoomViewsCard for a software system', () => {
   it('lists this system’s container views with title fallback to key', () => {
     loadWs()
-    render(<ZoomHoverCard element={systemElement} typeColor="#3b82f6" />)
+    render(<ZoomViewsCard element={systemElement} typeColor="#3b82f6" />)
 
     expect(screen.getByText('Level 2 – Container diagram')).toBeTruthy()
     expect(screen.getByText('Focal Containers')).toBeTruthy()
@@ -88,7 +88,7 @@ describe('ZoomHoverCard for a software system', () => {
       selectedRelationshipId: 'rel-1',
       selectedGroupId: 'g-1',
     })
-    render(<ZoomHoverCard element={systemElement} typeColor="#3b82f6" />)
+    render(<ZoomViewsCard element={systemElement} typeColor="#3b82f6" />)
 
     fireEvent.click(screen.getByText('cv-2'))
 
@@ -102,7 +102,7 @@ describe('ZoomHoverCard for a software system', () => {
 
   it('does nothing when clicking the already-active view', () => {
     loadWs()
-    render(<ZoomHoverCard element={systemElement} typeColor="#3b82f6" />)
+    render(<ZoomViewsCard element={systemElement} typeColor="#3b82f6" />)
     fireEvent.click(screen.getByText('Focal Containers'))
     const s = useWorkspaceStore.getState()
     expect(s.activeViewKey).toBe('cv-1')
@@ -112,7 +112,7 @@ describe('ZoomHoverCard for a software system', () => {
   it('does nothing when there is no active view', () => {
     loadWs()
     useWorkspaceStore.setState({ activeViewKey: null })
-    render(<ZoomHoverCard element={systemElement} typeColor="#3b82f6" />)
+    render(<ZoomViewsCard element={systemElement} typeColor="#3b82f6" />)
     fireEvent.click(screen.getByText('cv-2'))
     expect(useWorkspaceStore.getState().activeViewKey).toBeNull()
     expect(useWorkspaceStore.getState().viewHistory).toEqual([])
@@ -120,7 +120,7 @@ describe('ZoomHoverCard for a software system', () => {
 
   it('requests a new container diagram via pendingZoomConfirm', () => {
     loadWs()
-    render(<ZoomHoverCard element={systemElement} typeColor="#3b82f6" />)
+    render(<ZoomViewsCard element={systemElement} typeColor="#3b82f6" />)
     fireEvent.click(screen.getByText('New diagram'))
     expect(useWorkspaceStore.getState().pendingZoomConfirm).toEqual({
       elementId: 'sys-1',
@@ -130,22 +130,22 @@ describe('ZoomHoverCard for a software system', () => {
   })
 
   it('shows the empty message when no workspace is loaded', () => {
-    render(<ZoomHoverCard element={systemElement} typeColor="#3b82f6" />)
+    render(<ZoomViewsCard element={systemElement} typeColor="#3b82f6" />)
     expect(screen.getByText('No container diagrams for this object')).toBeTruthy()
   })
 })
 
-describe('ZoomHoverCard for a container', () => {
+describe('ZoomViewsCard for a container', () => {
   it('lists component views under a Level 3 header', () => {
     loadWs()
-    render(<ZoomHoverCard element={containerElement} typeColor="#8b5cf6" />)
+    render(<ZoomViewsCard element={containerElement} typeColor="#8b5cf6" />)
     expect(screen.getByText('Level 3 – Component diagram')).toBeTruthy()
     expect(screen.getByText('Web Components')).toBeTruthy()
   })
 
   it('requests a new component diagram via pendingZoomConfirm', () => {
     loadWs()
-    render(<ZoomHoverCard element={containerElement} typeColor="#8b5cf6" />)
+    render(<ZoomViewsCard element={containerElement} typeColor="#8b5cf6" />)
     fireEvent.click(screen.getByText('New diagram'))
     expect(useWorkspaceStore.getState().pendingZoomConfirm).toEqual({
       elementId: 'web',
@@ -155,22 +155,22 @@ describe('ZoomHoverCard for a container', () => {
   })
 })
 
-describe('ZoomHoverCard for other element types', () => {
+describe('ZoomViewsCard for other element types', () => {
   it('shows no child views for a person', () => {
     loadWs()
-    render(<ZoomHoverCard element={personElement} typeColor="#f59e0b" />)
+    render(<ZoomViewsCard element={personElement} typeColor="#f59e0b" />)
     expect(screen.getByText('Level 3 – Component diagram')).toBeTruthy()
     expect(screen.getByText('No component diagrams for this object')).toBeTruthy()
   })
 })
 
-describe('ZoomHoverCard interactions', () => {
+describe('ZoomViewsCard interactions', () => {
   it('stops click propagation so the node underneath is not selected', () => {
     loadWs()
     const onClick = vi.fn()
     const { container } = render(
       <div onClick={onClick}>
-        <ZoomHoverCard element={systemElement} typeColor="#3b82f6" />
+        <ZoomViewsCard element={systemElement} typeColor="#3b82f6" />
       </div>,
     )
     fireEvent.click(container.querySelector('.nodrag') as HTMLElement)
@@ -179,7 +179,7 @@ describe('ZoomHoverCard interactions', () => {
 
   it('applies and clears hover styling on view rows and the new-diagram button', () => {
     loadWs()
-    render(<ZoomHoverCard element={systemElement} typeColor="#3b82f6" />)
+    render(<ZoomViewsCard element={systemElement} typeColor="#3b82f6" />)
 
     const row = screen.getByText('cv-2').closest('button') as HTMLButtonElement
     fireEvent.mouseEnter(row)

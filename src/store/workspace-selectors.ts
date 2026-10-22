@@ -111,6 +111,18 @@ function findChildView(workspace: Workspace, elementId: string, currentViewKey?:
   return undefined
 }
 
+/** Container views of a system, or component views of a container. */
+export function getChildViews(workspace: Workspace | null, element: Pick<ModelElement, 'id' | 'type'>): View[] {
+  if (!workspace) return []
+  if (element.type === 'softwareSystem') {
+    return workspace.views.containerViews.filter(v => v.softwareSystemId === element.id)
+  }
+  if (element.type === 'container') {
+    return workspace.views.componentViews.filter(v => v.containerId === element.id)
+  }
+  return []
+}
+
 export function canDrillInto(workspace: Workspace, elementId: string): boolean {
   return findChildView(workspace, elementId) !== undefined
 }

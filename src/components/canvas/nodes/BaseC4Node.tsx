@@ -1,4 +1,5 @@
-import { useState, useRef, useCallback } from 'react'
+import { useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { useShallow } from 'zustand/react/shallow'
 import type { LucideIcon } from 'lucide-react'
 import { ZoomIn, AlertTriangle, Lock } from 'lucide-react'
@@ -7,10 +8,12 @@ import StatusDot from './StatusDot'
 import InlineName from './InlineName'
 import NodeHandles from './NodeHandles'
 import DocumentIndicator from '../DocumentIndicator'
-import ZoomHoverCard from './ZoomHoverCard'
+import ZoomViewsCard, { ZOOM_VIEWS_CARD_WIDTH } from './ZoomViewsCard'
 import { useWorkspaceStore } from '@/store/workspace'
+import { getChildViews } from '@/store/workspace-selectors'
 import { useSettingsStore } from '@/store/settings'
 import { useZoomLevel } from '@/hooks/useZoomLevel'
+import { useAnchoredPopover } from '@/hooks/useAnchoredPopover'
 import { pickHighlightReason } from '@/lib/highlight'
 import { SHAPE_ICON_MAP } from '@/lib/icons/registry'
 
@@ -265,39 +268,63 @@ export default function BaseC4Node({
   )
 }
 
-/** Zoom button with hover card popover */
+/** Zoom button. With one child view (or none) a click drills straight in;
+ *  with several it toggles a card listing them, like DocumentIndicator. */
 function ZoomButton({ element, typeColor, onDrillIn }: {
   element: C4NodeData['element']
   typeColor: string
   onDrillIn?: (id: string) => void
 }) {
-  const [hovered, setHovered] = useState(false)
-  const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const viewCount = useWorkspaceStore((s) => getChildViews(s.workspace, element).length)
+  const hasChoice = viewCount > 1
+  // Header + one row per view + "New diagram" button + padding.
+  const { open, setOpen, toggle, triggerRef, popupRef, coords } = useAnchoredPopover<HTMLButtonElement, HTMLDivElement>({
+    width: ZOOM_VIEWS_CARD_WIDTH,
+    side: 'auto',
+    height: 30 * Math.min(viewCount, 8) + 90,
+  })
 
-  const show = useCallback(() => {
-    if (hideTimer.current) { clearTimeout(hideTimer.current); hideTimer.current = null }
-    setHovered(true)
-  }, [])
-
-  const scheduleHide = useCallback(() => {
-    hideTimer.current = setTimeout(() => setHovered(false), 200)
-  }, [])
+  // The canvas pane can swallow bubbling mousedown, so also dismiss on a
+  // capture-phase pointerdown outside the card/trigger.
+  useEffect(() => {
+    if (!open) return
+    function onPointerDown(e: PointerEvent) {
+      const t = e.target as Node
+      if (popupRef.current?.contains(t) || triggerRef.current?.contains(t)) return
+      setOpen(false)
+    }
+    document.addEventListener('pointerdown', onPointerDown, true)
+    return () => document.removeEventListener('pointerdown', onPointerDown, true)
+  }, [open, popupRef, triggerRef, setOpen])
 
   return (
-    <div
-      style={{ position: 'relative' }}
-      onMouseEnter={show}
-      onMouseLeave={scheduleHide}
-    >
+    <>
       <button
+        ref={triggerRef}
         className="c4-node-action-btn c4-node-footer-btn nodrag"
         style={{ color: typeColor }}
-        onClick={(e) => { e.stopPropagation(); onDrillIn?.(element.id) }}
+        onDoubleClick={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.stopPropagation()
+          if (hasChoice) toggle()
+          else onDrillIn?.(element.id)
+        }}
         aria-label={`Zoom into ${element.name}`}
+        aria-haspopup={hasChoice ? 'menu' : undefined}
+        aria-expanded={hasChoice ? open : undefined}
       >
         <ZoomIn size={15} aria-hidden="true" />
       </button>
-      {hovered && <ZoomHoverCard element={element} typeColor={typeColor} />}
-    </div>
+      {hasChoice && open && coords && createPortal(
+        <ZoomViewsCard
+          element={element}
+          typeColor={typeColor}
+          onClose={() => setOpen(false)}
+          popupRef={popupRef}
+          style={{ position: 'fixed', top: coords.top, left: coords.left, zIndex: 1000 }}
+        />,
+        document.body,
+      )}
+    </>
   )
 }

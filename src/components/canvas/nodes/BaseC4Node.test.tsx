@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { ReactFlow, type NodeProps } from '@xyflow/react'
 import { Box } from 'lucide-react'
 import BaseC4Node from './BaseC4Node'
@@ -282,29 +282,69 @@ describe('BaseC4Node zoom button', () => {
     expect(onDrillIn).toHaveBeenCalledWith('sys-1')
   })
 
-  it('shows the hover card on mouse enter and hides it after mouse leave', async () => {
-    const { node } = renderNode({ data: { childCount: 2 } })
-    const wrapper = (node.querySelector('.c4-node-action-btn') as HTMLElement).parentElement as HTMLElement
+  function withContainerViews(count: number) {
+    const views = Array.from({ length: count }, (_, i) => ({
+      type: 'container' as const, key: `cv-${i}`, title: `Containers ${i}`,
+      softwareSystemId: 'sys-1', elements: [], relationships: [],
+    }))
+    useWorkspaceStore.setState({
+      activeViewKey: 'ctx',
+      workspace: {
+        name: 'Test',
+        model: { people: [], softwareSystems: [], relationships: [], groups: [] },
+        views: {
+          systemLandscapeViews: [], systemContextViews: [], containerViews: views,
+          componentViews: [], configuration: { styles: { elements: [], relationships: [] } },
+        },
+      },
+    } as never)
+  }
 
-    fireEvent.mouseEnter(wrapper)
-    expect(screen.getByText('New diagram')).toBeTruthy()
-
-    fireEvent.mouseLeave(wrapper)
-    // hide is delayed by 200ms so the user can move onto the card
-    expect(screen.queryByText('New diagram')).not.toBeNull()
-    await waitFor(() => expect(screen.queryByText('New diagram')).toBeNull())
+  it('drills straight in on click with a single child view, without a card', () => {
+    withContainerViews(1)
+    const onDrillIn = vi.fn()
+    const { node } = renderNode({ data: { childCount: 2, onDrillIn } })
+    const btn = node.querySelector('.c4-node-action-btn') as HTMLElement
+    expect(btn.getAttribute('aria-haspopup')).toBeNull()
+    fireEvent.mouseEnter(btn.parentElement as HTMLElement)
+    fireEvent.click(btn)
+    expect(onDrillIn).toHaveBeenCalledWith('sys-1')
+    expect(screen.queryByText('New diagram')).toBeNull()
   })
 
-  it('keeps the hover card open when re-entering before the hide delay elapses', async () => {
+  it('lists several child views on click instead of on hover', () => {
+    withContainerViews(2)
+    const onDrillIn = vi.fn()
+    const { node } = renderNode({ data: { childCount: 2, onDrillIn } })
+    const btn = node.querySelector('.c4-node-action-btn') as HTMLElement
+
+    fireEvent.mouseEnter(btn.parentElement as HTMLElement)
+    expect(screen.queryByText('New diagram')).toBeNull()
+
+    fireEvent.click(btn)
+    expect(onDrillIn).not.toHaveBeenCalled()
+    expect(btn.getAttribute('aria-expanded')).toBe('true')
+    expect(screen.getByText('Containers 0')).toBeTruthy()
+    expect(screen.getByText('Containers 1')).toBeTruthy()
+    // Portalled outside the node so viewport zoom doesn't scale it.
+    expect(node.contains(screen.getByText('Containers 0'))).toBe(false)
+
+    fireEvent.click(btn)
+    expect(screen.queryByText('New diagram')).toBeNull()
+  })
+
+  it('closes the view list on an outside pointerdown or Escape', () => {
+    withContainerViews(2)
     const { node } = renderNode({ data: { childCount: 2 } })
-    const wrapper = (node.querySelector('.c4-node-action-btn') as HTMLElement).parentElement as HTMLElement
+    const btn = node.querySelector('.c4-node-action-btn') as HTMLElement
 
-    fireEvent.mouseEnter(wrapper)
-    fireEvent.mouseLeave(wrapper)
-    fireEvent.mouseEnter(wrapper) // cancels the pending hide timer
+    fireEvent.click(btn)
+    fireEvent.pointerDown(document.body)
+    expect(screen.queryByText('New diagram')).toBeNull()
 
-    await new Promise((r) => setTimeout(r, 250))
-    expect(screen.queryByText('New diagram')).not.toBeNull()
+    fireEvent.click(btn)
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByText('New diagram')).toBeNull()
   })
 
   describe('document indicator', () => {

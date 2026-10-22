@@ -1,23 +1,21 @@
+import type { CSSProperties, Ref } from 'react'
 import { ZoomIn, Plus } from 'lucide-react'
 import { useWorkspaceStore } from '@/store/workspace'
-import type { ModelElement, View } from '@/types/model'
+import { getChildViews } from '@/store/workspace-selectors'
+import type { ModelElement } from '@/types/model'
 
 interface Props {
   element: ModelElement
   typeColor: string
+  /** Called after the card navigates or starts a new diagram. */
+  onClose?: () => void
+  /** Positioning from the caller — the card is portalled outside the canvas
+   *  so it keeps its size at any viewport zoom. */
+  popupRef?: Ref<HTMLDivElement>
+  style?: CSSProperties
 }
 
-function getChildViews(element: ModelElement): View[] {
-  const workspace = useWorkspaceStore.getState().workspace
-  if (!workspace) return []
-  if (element.type === 'softwareSystem') {
-    return workspace.views.containerViews.filter(v => v.softwareSystemId === element.id)
-  }
-  if (element.type === 'container') {
-    return workspace.views.componentViews.filter(v => v.containerId === element.id)
-  }
-  return []
-}
+export const ZOOM_VIEWS_CARD_WIDTH = 240
 
 function getLevelLabel(element: ModelElement): { level: number; label: string; viewType: string } {
   if (element.type === 'softwareSystem') {
@@ -26,12 +24,13 @@ function getLevelLabel(element: ModelElement): { level: number; label: string; v
   return { level: 3, label: 'Component diagram', viewType: 'component' }
 }
 
-export default function ZoomHoverCard({ element, typeColor }: Props) {
+export default function ZoomViewsCard({ element, typeColor, onClose, popupRef, style }: Props) {
   const activeViewKey = useWorkspaceStore((s) => s.activeViewKey)
-  const childViews = getChildViews(element)
+  const childViews = getChildViews(useWorkspaceStore.getState().workspace, element)
   const { level, label, viewType } = getLevelLabel(element)
 
   const navigateToView = (viewKey: string) => {
+    onClose?.()
     const s = useWorkspaceStore.getState()
     if (!s.activeViewKey || viewKey === s.activeViewKey) return
     useWorkspaceStore.setState({
@@ -44,6 +43,7 @@ export default function ZoomHoverCard({ element, typeColor }: Props) {
   }
 
   const createNewDiagram = () => {
+    onClose?.()
     const target = element.type === 'softwareSystem' ? 'container' as const : 'component' as const
     useWorkspaceStore.setState({
       pendingZoomConfirm: { elementId: element.id, elementName: element.name, targetType: target },
@@ -52,20 +52,20 @@ export default function ZoomHoverCard({ element, typeColor }: Props) {
 
   return (
     <div
+      ref={popupRef}
       className="nodrag nowheel nopan"
       onClick={(e) => e.stopPropagation()}
+      onMouseDown={(e) => e.stopPropagation()}
+      onPointerDown={(e) => e.stopPropagation()}
+      onDoubleClick={(e) => e.stopPropagation()}
       style={{
-        position: 'absolute',
-        top: '100%',
-        left: 0,
-        marginTop: 6,
-        width: 240,
+        width: ZOOM_VIEWS_CARD_WIDTH,
         padding: '10px 12px',
         borderRadius: 10,
         background: 'var(--color-surface-1)',
         border: '1px solid var(--color-border)',
         boxShadow: '0 8px 24px rgba(0,0,0,0.45)',
-        zIndex: 50,
+        ...style,
       }}
     >
       {/* Header */}
