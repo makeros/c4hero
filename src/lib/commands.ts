@@ -4,7 +4,7 @@ import {
   MousePointer, LayoutDashboard, Maximize2, ZoomIn, ZoomOut,
   LayoutGrid, Search, Save, Settings, Monitor,
   Presentation, FolderOpen, Image, FileCode, Copy, Plus,
-  Highlighter, MousePointerClick, RotateCcw, CircleHelp, Sparkles, Package, Shapes, FileText,
+  Highlighter, MousePointerClick, RotateCcw, CircleHelp, Sparkles, Package, Shapes, FileText, SquareTerminal, TextCursorInput,
 } from 'lucide-react'
 import { useWorkspaceStore, getCreatableTypes, getActiveView, getAllViews, isFocalScopeElement } from '@/store/workspace'
 import { useSettingsStore } from '@/store/settings'
@@ -16,6 +16,9 @@ import { downloadFile, downloadBlob, exportCanvasAsPNG, exportCanvasAsSVG } from
 import { extractSidecar, serializeSidecar } from '@/lib/sidecar'
 import { fitContentNodesToViewport } from '@/lib/fitViewport'
 import { announce } from '@/lib/announce'
+import { isAgentTerminalAvailable } from '@/lib/agentTerminal/availability'
+import { formatSelectionForAgent } from '@/lib/agentTerminal/selection'
+import { insertText } from '@/lib/agentTerminal/agentTerminalBus'
 import type { ReactFlowInstance } from '@xyflow/react'
 
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
@@ -294,6 +297,45 @@ export function getCommands(reactFlow: ReactFlowInstance | null): Command[] {
         useSettingsStore.getState().update({ documentsSidebarOpen: !open })
       },
     },
+    // Dev-only: the terminal exists only in `npm run dev -- --terminal`.
+    ...(import.meta.env.DEV
+      ? ([
+      {
+        id: 'toggle-agent-terminal',
+        label: 'Toggle Agent Terminal',
+        category: 'view',
+        icon: SquareTerminal,
+        keywords: ['terminal', 'shell', 'agent', 'claude', 'cli'],
+        when: isAgentTerminalAvailable,
+        execute: () => {
+          const open = useSettingsStore.getState().agentTerminalOpen
+          useSettingsStore.getState().update({ agentTerminalOpen: !open })
+        },
+      },
+      {
+        id: 'send-selection-to-terminal',
+        label: 'Send Selection to Agent Terminal',
+        category: 'view',
+        icon: TextCursorInput,
+        keywords: ['selection', 'send', 'agent', 'terminal'],
+        when: () => {
+          if (!isAgentTerminalAvailable() || !useSettingsStore.getState().agentTerminalOpen) return false
+          const s = store()
+          return s.selectedElementIds.length > 0 || !!s.selectedRelationshipId
+        },
+        execute: () => {
+          const s = store()
+          const text = formatSelectionForAgent({
+            filename: s.activeWorkspaceFilename,
+            viewKey: s.activeViewKey,
+            elementIds: s.selectedElementIds,
+            relationshipId: s.selectedRelationshipId,
+          })
+          if (text) insertText(text)
+        },
+      },
+        ] as Command[])
+      : []),
     {
       id: 'new-view',
       label: 'New View',

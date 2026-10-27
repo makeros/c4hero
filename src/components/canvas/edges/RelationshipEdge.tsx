@@ -11,7 +11,7 @@ import {
 import type { Relationship, RelationshipStyle } from '@/types/model'
 import DocumentIndicator from '../DocumentIndicator'
 import { useSettingsStore } from '@/store/settings'
-import { getEdgeLabelDensity, truncateEdgeLabel } from './relationshipEdgeLabels'
+import { getEdgeLabelDensity, orderBadgePosition, truncateEdgeLabel } from './relationshipEdgeLabels'
 
 interface RelationshipEdgeData {
   relationship: Relationship
@@ -91,6 +91,10 @@ function RelationshipEdge({
     })
   }
 
+  const [badgeX, badgeY] = orderBadgePosition(
+    sourceX, sourceY, targetX, targetY, sourcePosition, lineStyle === 'Straight',
+  )
+
   // Apply style from RelationshipStyle if available
   const strokeColor = emphasized
     ? 'var(--canvas-selection, var(--color-accent))'
@@ -152,7 +156,8 @@ function RelationshipEdge({
         markerStart={emphasized ? 'url(#c4-dot-selected)' : 'url(#c4-dot)'}
         markerEnd={emphasized ? 'url(#c4-arrow-selected)' : 'url(#c4-arrow)'}
       />
-      {/* Dynamic-view interaction order badge — a numbered chip on the edge. */}
+      {/* Dynamic-view interaction order badge — a numbered chip near the
+          source end, so the description label at the midpoint can't cover it. */}
       {order && (
         <EdgeLabelRenderer>
           <div
@@ -160,7 +165,7 @@ function RelationshipEdge({
             aria-label={`Step ${order}`}
             style={{
               position: 'absolute',
-              transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY - 22}px)`,
+              transform: `translate(-50%, -50%) translate(${badgeX}px, ${badgeY}px)`,
               minWidth: 20,
               height: 20,
               padding: '0 6px',

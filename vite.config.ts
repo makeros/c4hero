@@ -20,6 +20,7 @@ import {
 import { DOC_CHANGED_EVENT, type DocChange } from './src/lib/docLiveReload.ts'
 import { readFileSync, existsSync, statSync, readdirSync } from 'fs'
 import type { ServerResponse } from 'node:http'
+import { agentTerminalPlugin } from './dev-server/agentTerminalPlugin.ts'
 
 // Set by scripts/build-plugin.mjs: builds the headless export viewer into
 // plugins/c4hero/viewer/ (relative base, no PWA, no document collection, a
@@ -340,6 +341,7 @@ export default defineConfig({
         }
       },
     } satisfies Plugin]),
+    ...(exportBuild ? [] : [agentTerminalPlugin()]),
     ...(exportBuild ? [] : [VitePWA({
       registerType: 'autoUpdate',
       selfDestroying: lockedViewerBuild,

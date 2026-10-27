@@ -152,7 +152,7 @@ export default function FloatingToolRail() {
       data-canvas-chrome="tool-rail-wrap"
       style={{
         position: 'fixed',
-        left: 14,
+        left: 'calc(14px + var(--agent-terminal-w, 0px))',
         top: '50%',
         transform: 'translateY(-50%)',
         zIndex: 50,

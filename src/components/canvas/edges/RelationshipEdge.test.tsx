@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { Position } from '@xyflow/react'
 import RelationshipEdge from './RelationshipEdge'
-import { getEdgeLabelDensity, truncateEdgeLabel } from './relationshipEdgeLabels'
+import { getEdgeLabelDensity, orderBadgePosition, truncateEdgeLabel } from './relationshipEdgeLabels'
 
 vi.mock('@xyflow/react', async () => {
   const actual = await vi.importActual<typeof import('@xyflow/react')>('@xyflow/react')
@@ -121,5 +121,25 @@ describe('RelationshipEdge document indicator', () => {
     fireEvent.click(screen.getByRole('button', { name: '1 document for relationship' }))
     expect(open).toHaveBeenCalledWith('/document-view?path=a.md&title=A', '_blank', 'noopener,noreferrer')
     open.mockRestore()
+  })
+})
+
+describe('orderBadgePosition', () => {
+  it('sits just outside the source side for curved and orthogonal edges', () => {
+    expect(orderBadgePosition(100, 100, 400, 300, Position.Right, false)).toEqual([122, 100])
+    expect(orderBadgePosition(100, 100, 400, 300, Position.Bottom, false)).toEqual([100, 122])
+    expect(orderBadgePosition(100, 100, 0, 0, Position.Left, false)).toEqual([78, 100])
+    expect(orderBadgePosition(100, 100, 0, 0, Position.Top, false)).toEqual([100, 78])
+  })
+
+  it('follows the line toward the target for straight edges', () => {
+    const [x, y] = orderBadgePosition(0, 0, 30, 40, Position.Right, true)
+    expect(x).toBeCloseTo(13.2)
+    expect(y).toBeCloseTo(17.6)
+  })
+
+  it('stays far from the midpoint label on a long edge', () => {
+    const [x] = orderBadgePosition(0, 0, 400, 0, Position.Right, false)
+    expect(x).toBeLessThan(50)
   })
 })

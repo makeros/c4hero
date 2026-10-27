@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Agent terminal (dev server only).** `npm run dev -- --workspace <dir>
+  --terminal` embeds a persistent shell in a left-docked panel, toggled from
+  the command palette, so Claude Code or the `c4hero` CLI can run beside the
+  canvas. The current selection can be sent to the prompt. Guarded by
+  loopback, `Host`, `Origin` and per-start token checks; refused on Windows
+  and with tunnel or LAN dev settings; absent from production builds.
+
 - **C4 cheat sheet.** A new `/cheat-sheet` page, opened in a new tab from a
   `BookOpenText` icon in the canvas top pill (also shown in read-only mode and
   as a menu row on mobile), covers every C4/Structurizr element kind and view
