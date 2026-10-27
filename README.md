@@ -94,6 +94,18 @@ npm run dev -- --workspace /path/to/docs/svd
 
 This also opens the app in your browser automatically. If that folder was opened before, it's restored with zero clicks. Otherwise the native folder picker opens and a banner tells you which folder to select — the browser's File System Access API can't jump straight to an arbitrary path on a first run.
 
+#### Agent terminal (dev only)
+
+Add `--terminal` to embed a shell (for `claude`, the `c4hero` CLI, etc.) in a left-docked panel, opened with "Toggle Agent Terminal" in the command palette:
+
+```bash
+npm run dev -- --workspace /path/to/docs/svd --terminal
+```
+
+Requires macOS or Linux, `--workspace`, and a localhost-only server (it refuses to start on Windows, without `--workspace`, or with `--host`, `VITE_HMR_TUNNEL` or `VITE_ALLOWED_HOSTS`). The shell starts in the workspace's git root. `node-pty` is a native module; the dev server adds the execute bit to its `spawn-helper` at startup if the prebuild lacks it.
+
+The terminal runs arbitrary commands as you with the dev server's environment. Access is limited to loopback connections with a per-start token and localhost `Host`/`Origin`, and the feature is absent from plain `npm run dev` and every build.
+
 ### Available commands
 
 ```bash

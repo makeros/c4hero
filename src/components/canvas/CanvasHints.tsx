@@ -85,7 +85,7 @@ function Hint({ id, children, onDismiss }: { id: string; children: React.ReactNo
         animation: 'fadeIn 400ms ease',
         // Centered over the canvas (not the full viewport) when the
         // documents sidebar is docked open.
-        left: 'calc((100% - var(--docs-sidebar-w, 0px)) / 2)',
+        left: 'calc(var(--agent-terminal-w, 0px) + (100% - var(--agent-terminal-w, 0px) - var(--docs-sidebar-w, 0px)) / 2)',
       }}
     >
       {children}

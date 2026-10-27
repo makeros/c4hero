@@ -259,7 +259,7 @@ export default function BottomHighlighterBar() {
         position: 'fixed',
         // Centered over the canvas (not the full viewport) when the
         // documents sidebar is docked open.
-        left: 'calc((100% - var(--docs-sidebar-w, 0px)) / 2)',
+        left: 'calc(var(--agent-terminal-w, 0px) + (100% - var(--agent-terminal-w, 0px) - var(--docs-sidebar-w, 0px)) / 2)',
         bottom: 14,
         transform: 'translateX(-50%)',
         zIndex: 50,

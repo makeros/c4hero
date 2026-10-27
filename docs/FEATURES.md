@@ -32,6 +32,7 @@ A more detailed reference for what c4hero ships. The README is the elevator pitc
 - **Single-file mode** (all browsers): open a `.dsl` file directly. Saves either go back to the source handle (where supported) or trigger a download.
 - **Recent collections / files** are remembered in `localStorage` and re-openable from the welcome screen.
 - **Crash recovery**: the active workspace is mirrored to `localStorage`. If the tab crashes or you close it mid-edit, the next launch offers to restore.
+- **Agent terminal** (dev server only): `npm run dev -- --workspace <dir> --terminal` adds a left-docked terminal running your login shell in the workspace's git root, so `claude` or the `c4hero` CLI can edit the open `.dsl` and the canvas refreshes. The shell survives page reloads, and "Send Selection to Agent Terminal" types a reference to the selected elements at the prompt. Localhost-only; not available in production builds.
 
 ## Editing UX
 

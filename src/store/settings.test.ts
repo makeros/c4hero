@@ -4,6 +4,9 @@ import {
   DOCUMENTS_SIDEBAR_MIN_WIDTH,
   DOCUMENTS_SIDEBAR_MAX_WIDTH,
   DOCUMENTS_SIDEBAR_DEFAULT_WIDTH,
+  AGENT_TERMINAL_MIN_WIDTH,
+  AGENT_TERMINAL_MAX_WIDTH,
+  AGENT_TERMINAL_DEFAULT_WIDTH,
 } from './settings'
 
 const STORAGE_KEY = 'c4hero.json'
@@ -19,6 +22,8 @@ const RESET_DEFAULTS = {
   alwaysExpandDetails: false,
   documentsSidebarOpen: false,
   documentsSidebarWidth: DOCUMENTS_SIDEBAR_DEFAULT_WIDTH,
+  agentTerminalOpen: false,
+  agentTerminalWidth: AGENT_TERMINAL_DEFAULT_WIDTH,
 }
 
 async function importFreshSettingsStore() {
@@ -64,6 +69,11 @@ describe('useSettingsStore', () => {
 
   it('has default documentsSidebarOpen false', () => {
     expect(useSettingsStore.getState().documentsSidebarOpen).toBe(false)
+  })
+
+  it('has default agentTerminalOpen false and agentTerminalWidth', () => {
+    expect(useSettingsStore.getState().agentTerminalOpen).toBe(false)
+    expect(useSettingsStore.getState().agentTerminalWidth).toBe(AGENT_TERMINAL_DEFAULT_WIDTH)
   })
 
   it('has default documentsSidebarWidth', () => {
@@ -177,6 +187,24 @@ describe('useSettingsStore', () => {
 
       const freshStore = await importFreshSettingsStore()
       expect(freshStore.getState().documentsSidebarOpen).toBe(true)
+    })
+
+    it('clamps agentTerminalWidth to the minimum when persisted value is too small', async () => {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ agentTerminalWidth: 10 }))
+      const freshStore = await importFreshSettingsStore()
+      expect(freshStore.getState().agentTerminalWidth).toBe(AGENT_TERMINAL_MIN_WIDTH)
+    })
+
+    it('clamps agentTerminalWidth to the maximum when persisted value is too large', async () => {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ agentTerminalWidth: 5000 }))
+      const freshStore = await importFreshSettingsStore()
+      expect(freshStore.getState().agentTerminalWidth).toBe(AGENT_TERMINAL_MAX_WIDTH)
+    })
+
+    it('falls back to the default agentTerminalWidth when persisted value is not a number', async () => {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ agentTerminalWidth: 'wide' }))
+      const freshStore = await importFreshSettingsStore()
+      expect(freshStore.getState().agentTerminalWidth).toBe(AGENT_TERMINAL_DEFAULT_WIDTH)
     })
 
     it('clamps documentsSidebarWidth to the minimum when persisted value is too small', async () => {

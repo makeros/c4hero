@@ -53,12 +53,12 @@ function quotedAttributeValue(value: string): string {
   return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
 }
 
-/** Current `--docs-sidebar-w` value in px (0 when unset/closed), read live
- *  from the root element — the bar's clamp must stay within the canvas area,
- *  not slide under the docked sidebar. */
-function getDocsSidebarWidth(): number {
+/** Current value of a docked-panel width variable in px (0 when unset/closed),
+ *  read live from the root element — the bar's clamp must stay within the
+ *  canvas area, not slide under a docked panel. */
+function getDockedWidth(cssVar: string): number {
   if (typeof document === 'undefined') return 0
-  const raw = getComputedStyle(document.documentElement).getPropertyValue('--docs-sidebar-w').trim()
+  const raw = getComputedStyle(document.documentElement).getPropertyValue(cssVar).trim()
   const parsed = Number.parseFloat(raw)
   return Number.isFinite(parsed) ? parsed : 0
 }
@@ -142,10 +142,11 @@ export default function MultiSelectBar() {
   const BAR_H = 40
   const OFFSET_Y = 12 // gap above the top of the selection
 
-  // Clamp so bar never goes off-screen — subtract the docked documents
-  // sidebar's width so the bar never slides underneath it.
-  const vpW = window.innerWidth - getDocsSidebarWidth()
-  const left = Math.max(8, Math.min(pos.x - BAR_W / 2, vpW - BAR_W - 8))
+  // Clamp so bar never goes off-screen — stay clear of the docked agent
+  // terminal (left) and documents sidebar (right).
+  const leftInset = getDockedWidth('--agent-terminal-w')
+  const vpW = window.innerWidth - getDockedWidth('--docs-sidebar-w')
+  const left = Math.max(leftInset + 8, Math.min(pos.x - BAR_W / 2, vpW - BAR_W - 8))
   const top = Math.max(64, pos.y - BAR_H - OFFSET_Y)
 
   // Align flyout: if the bar is near the top of the viewport, open the

@@ -27,12 +27,19 @@ import { loadFromLocalStorage } from '@/lib/fileIO'
 import { restoreDirHandle, getCurrentDirHandle } from '@/lib/folderIO'
 import { isCanvasRoute, isStandaloneRoute } from '@/lib/routes'
 import { getLockedWorkspace } from '@/lib/lockedWorkspace'
+import { useSettingsStore } from '@/store/settings'
+import { isAgentTerminalAvailable } from '@/lib/agentTerminal/availability'
 
 const SearchDialog = lazy(() => import('@/components/search/SearchDialog'))
 const WelcomeScreen = lazy(() => import('@/components/welcome/WelcomeScreen'))
 const AiPanel = lazy(() => import('@/components/ai/AiPanel'))
 const DocumentView = lazy(() => import('@/components/views/DocumentView'))
 const CheatSheet = lazy(() => import('@/components/views/CheatSheet'))
+// Dev-server-only: the constant check lets production builds drop the chunk
+// (xterm included).
+const AgentTerminalPanel = import.meta.env.DEV
+  ? lazy(() => import('@/components/agent-terminal/AgentTerminalPanel'))
+  : null
 
 export default function App() {
   const workspace = useWorkspaceStore((s) => s.workspace)
@@ -47,6 +54,7 @@ export default function App() {
   const aiSettingsOpen = useWorkspaceStore((s) => s.aiSettingsOpen)
   const setAiSettingsOpen = useWorkspaceStore((s) => s.setAiSettingsOpen)
   const loadWorkspace = useWorkspaceStore((s) => s.loadWorkspace)
+  const agentTerminalOpen = useSettingsStore((s) => s.agentTerminalOpen)
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -108,7 +116,7 @@ export default function App() {
     <ReactFlowProvider>
       <a href="#c4hero-canvas" className="sr-only">Skip to main content</a>
       <div style={{ position: 'fixed', inset: 0, background: 'var(--color-bg-primary)' }}>
-        <main id="c4hero-canvas" aria-label="Architecture diagram canvas" style={{ position: 'absolute', inset: 0, right: 'var(--docs-sidebar-w, 0px)' }}>
+        <main id="c4hero-canvas" aria-label="Architecture diagram canvas" style={{ position: 'absolute', inset: 0, left: 'var(--agent-terminal-w, 0px)', right: 'var(--docs-sidebar-w, 0px)' }}>
           <ErrorBoundary label="Canvas error" onHome={() => useWorkspaceStore.getState().closeWorkspace()}>
             <Canvas />
           </ErrorBoundary>
@@ -120,6 +128,9 @@ export default function App() {
         <FloatingViewsPanel />
         <aside aria-label="Element inspector"><FloatingInspector /></aside>
         <DocumentsSidebar />
+        {import.meta.env.DEV && AgentTerminalPanel && agentTerminalOpen && isAgentTerminalAvailable() && !presentationMode && (
+          <Suspense fallback={null}><AgentTerminalPanel /></Suspense>
+        )}
         <BottomHighlighterBar />
         <FloatingBottomStrip />
         <FloatingZoomHud />

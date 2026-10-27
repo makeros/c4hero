@@ -243,7 +243,7 @@ export default function FloatingTopPill() {
         style={{
           position: 'fixed',
           top: 'max(14px, calc(env(safe-area-inset-top, 0px) + 8px))',
-          left: 0,
+          left: 'var(--agent-terminal-w, 0px)',
           // Stays centered over the canvas (not the full viewport) when the
           // documents sidebar is docked open.
           right: 'var(--docs-sidebar-w, 0px)',
@@ -688,7 +688,7 @@ export default function FloatingTopPill() {
         <div style={{
           position: 'fixed',
           bottom: 'max(72px, calc(env(safe-area-inset-bottom, 0px) + 72px))',
-          left: 'calc((100% - var(--docs-sidebar-w, 0px)) / 2)',
+          left: 'calc(var(--agent-terminal-w, 0px) + (100% - var(--agent-terminal-w, 0px) - var(--docs-sidebar-w, 0px)) / 2)',
           transform: 'translateX(-50%)',
           zIndex: 100,
           background: 'var(--glass-bg)',

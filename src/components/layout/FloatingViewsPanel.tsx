@@ -46,7 +46,7 @@ export default function FloatingViewsPanel() {
         className="glass-panel-solid"
         style={{
           position: 'fixed',
-          left: 70,
+          left: 'calc(70px + var(--agent-terminal-w, 0px))',
           top: 14,
           zIndex: 49,
           width: 220,

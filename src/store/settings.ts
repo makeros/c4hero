@@ -37,11 +37,20 @@ export interface AppSettings {
   /** Width in px of the documents sidebar, clamped to
    *  [DOCUMENTS_SIDEBAR_MIN_WIDTH, DOCUMENTS_SIDEBAR_MAX_WIDTH]. */
   documentsSidebarWidth: number
+  /** Whether the dev-only agent terminal is docked open on the left of the canvas. */
+  agentTerminalOpen: boolean
+  /** Width in px of the agent terminal, clamped to
+   *  [AGENT_TERMINAL_MIN_WIDTH, AGENT_TERMINAL_MAX_WIDTH]. */
+  agentTerminalWidth: number
 }
 
 export const DOCUMENTS_SIDEBAR_MIN_WIDTH = 280
 export const DOCUMENTS_SIDEBAR_MAX_WIDTH = 640
 export const DOCUMENTS_SIDEBAR_DEFAULT_WIDTH = 340
+
+export const AGENT_TERMINAL_MIN_WIDTH = 360
+export const AGENT_TERMINAL_MAX_WIDTH = 1200
+export const AGENT_TERMINAL_DEFAULT_WIDTH = 560
 
 const DEFAULTS: AppSettings = {
   // Minimap is off by default; users can switch it to Auto/Always in canvas settings.
@@ -55,6 +64,8 @@ const DEFAULTS: AppSettings = {
   globalLineStyle: undefined,
   documentsSidebarOpen: false,
   documentsSidebarWidth: DOCUMENTS_SIDEBAR_DEFAULT_WIDTH,
+  agentTerminalOpen: false,
+  agentTerminalWidth: AGENT_TERMINAL_DEFAULT_WIDTH,
 }
 
 const STORAGE_KEY = 'c4hero.json'
@@ -98,6 +109,13 @@ function readDocumentsSidebarWidth(source: Record<string, unknown>): number {
     : DEFAULTS.documentsSidebarWidth
 }
 
+function readAgentTerminalWidth(source: Record<string, unknown>): number {
+  const value = source.agentTerminalWidth
+  return typeof value === 'number' && Number.isFinite(value)
+    ? Math.min(AGENT_TERMINAL_MAX_WIDTH, Math.max(AGENT_TERMINAL_MIN_WIDTH, value))
+    : DEFAULTS.agentTerminalWidth
+}
+
 function normalizeSettings(value: unknown): AppSettings {
   const source = isRecord(value) ? value : {}
   return {
@@ -113,6 +131,8 @@ function normalizeSettings(value: unknown): AppSettings {
       : DEFAULTS.globalLineStyle,
     documentsSidebarOpen: readBoolean(source, 'documentsSidebarOpen', DEFAULTS.documentsSidebarOpen),
     documentsSidebarWidth: readDocumentsSidebarWidth(source),
+    agentTerminalOpen: readBoolean(source, 'agentTerminalOpen', DEFAULTS.agentTerminalOpen),
+    agentTerminalWidth: readAgentTerminalWidth(source),
   }
 }
 

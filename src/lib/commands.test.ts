@@ -3,6 +3,9 @@ import { getCommands, CATEGORY_ORDER, CATEGORY_LABELS, type Command } from './co
 import { useWorkspaceStore, getAllViews } from '@/store/workspace'
 import { saveDSLFile, writeSidecarToHandle } from '@/lib/fileIO'
 import { downloadFile, downloadBlob, exportCanvasAsPNG, exportCanvasAsSVG } from '@/lib/exportUtils'
+import { useSettingsStore } from '@/store/settings'
+import { isAgentTerminalAvailable } from '@/lib/agentTerminal/availability'
+import { onInsertText } from '@/lib/agentTerminal/agentTerminalBus'
 import type { ReactFlowInstance } from '@xyflow/react'
 import type { Workspace } from '@/types/model'
 
@@ -25,6 +28,11 @@ vi.mock('@/lib/exportUtils', async (importOriginal) => {
     exportCanvasAsSVG: vi.fn(),
   }
 })
+
+vi.mock('@/lib/agentTerminal/availability', () => ({
+  isAgentTerminalAvailable: vi.fn(() => false),
+  agentTerminalToken: vi.fn(() => null),
+}))
 
 function makeWorkspace(): Workspace {
   return {
@@ -565,5 +573,56 @@ describe('command metadata', () => {
     for (const category of CATEGORY_ORDER) {
       expect(CATEGORY_LABELS[category]).toBeTruthy()
     }
+  })
+})
+
+// ─── Agent terminal commands ─────────────────────────────────────────
+
+describe('agent terminal commands', () => {
+  beforeEach(() => {
+    vi.mocked(isAgentTerminalAvailable).mockReturnValue(false)
+    useSettingsStore.getState().update({ agentTerminalOpen: false })
+  })
+
+  it('both commands are hidden when the terminal is unavailable', () => {
+    useSettingsStore.getState().update({ agentTerminalOpen: true })
+    store().selectElements(['alice'])
+    expect(command('toggle-agent-terminal').when!()).toBe(false)
+    expect(command('send-selection-to-terminal').when!()).toBe(false)
+  })
+
+  it('toggle flips agentTerminalOpen', () => {
+    vi.mocked(isAgentTerminalAvailable).mockReturnValue(true)
+    const cmd = command('toggle-agent-terminal')
+    expect(cmd.when!()).toBe(true)
+    cmd.execute()
+    expect(useSettingsStore.getState().agentTerminalOpen).toBe(true)
+    cmd.execute()
+    expect(useSettingsStore.getState().agentTerminalOpen).toBe(false)
+  })
+
+  it('send is hidden with no selection or with the panel closed', () => {
+    vi.mocked(isAgentTerminalAvailable).mockReturnValue(true)
+    const cmd = command('send-selection-to-terminal')
+    useSettingsStore.getState().update({ agentTerminalOpen: true })
+    store().clearSelection()
+    expect(cmd.when!()).toBe(false)
+    store().selectElements(['alice'])
+    useSettingsStore.getState().update({ agentTerminalOpen: false })
+    expect(cmd.when!()).toBe(false)
+  })
+
+  it('send emits the formatted selection on the bus', () => {
+    vi.mocked(isAgentTerminalAvailable).mockReturnValue(true)
+    useSettingsStore.getState().update({ agentTerminalOpen: true })
+    store().selectElements(['alice'])
+    const cmd = command('send-selection-to-terminal')
+    expect(cmd.when!()).toBe(true)
+    const received: string[] = []
+    const off = onInsertText((t) => received.push(t))
+    cmd.execute()
+    off()
+    expect(received).toHaveLength(1)
+    expect(received[0]).toMatch(/^\[c4hero .*elements=alice\] $/)
   })
 })
